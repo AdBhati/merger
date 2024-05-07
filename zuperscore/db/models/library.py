@@ -1,7 +1,7 @@
 import os
 from django.db import models
 
-from assessment.zuperscore.db.models.base import User
+from zuperscore.db.models.base import User
 from ..mixins import TimeAuditModel
 
 

@@ -7,6 +7,7 @@ import re
 from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
+from zuperscore.api.permissions.permissions import IsAdminOrUserManager
 from rest_framework.views import APIView
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -42,11 +43,10 @@ from zuperscore.api.views.conduct import (
 
 
 from zuperscore.utils.msg import send_sms
-PHONE_NUMBER_REGEX_PATTERN = ".*?(\(?\d{3}\D{0,3}\d{3}\D{0,3}\d{4}).*?"
+PHONE_NUMBER_REGEX_PATTERN = ".*?(\\(?\\d{3}\\D{0,3}\\d{3}\\D{0,3}\\d{4}).*?"
 EMAIL_ADDRESS_REGEX_PATTERN = (
-    "([A-Za-z0-9]+[.-_])*[A-Za-z0-9]+@[A-Za-z0-9-]+(\.[A-Z|a-z]{2,})+"
+    "([A-Za-z0-9]+[.-_])*[A-Za-z0-9]+@[A-Za-z0-9-]+(\\.[A-Z|a-z]{2,})+"
 )
-
 
 def check_valid_phone_number(phone_number):
     if len(phone_number) > 15:

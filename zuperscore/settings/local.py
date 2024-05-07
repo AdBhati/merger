@@ -17,22 +17,22 @@ EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FILE_STORAGE = "django_s3_storage.storage.S3Storage"
 
 DATABASES = {
-    # "default": {
-    #     "ENGINE": "django.db.backends.postgresql_psycopg2",
-    #     "NAME": "zuperscore-local-13_02_23",
-    #     "USER": "postgres",
-    #     "PASSWORD": "1234",
-    #     "HOST": "localhost",
-    # }
-
-
     "default": {
         "ENGINE": "django.db.backends.postgresql_psycopg2",
-        "NAME": "d5rhp1f2jpqd71",
-        "USER": "u3k2pafkhimndq",
-        "PASSWORD": "pd19dfecbe12e0cbd2ddd68cab4b5d453fc35190cc568541ec245838cf937c427",
-        "HOST": "ec2-44-213-9-110.compute-1.amazonaws.com",
-    },
+        "NAME": "zuperscore_conduct",
+        "USER": "postgres",
+        "PASSWORD": "1234",
+        "HOST": "localhost",
+    }
+
+
+    # "default": {
+    #     "ENGINE": "django.db.backends.postgresql_psycopg2",
+    #     "NAME": "d5rhp1f2jpqd71",
+    #     "USER": "u3k2pafkhimndq",
+    #     "PASSWORD": "pd19dfecbe12e0cbd2ddd68cab4b5d453fc35190cc568541ec245838cf937c427",
+    #     "HOST": "ec2-44-213-9-110.compute-1.amazonaws.com",
+    # },
 }
 
 
