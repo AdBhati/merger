@@ -1,0 +1,8 @@
+{
+    "python.autoComplete.extraPaths": [],
+    "python.formatting.blackArgs": [
+        "--line-length",
+        "119"
+    ],
+    "python.analysis.extraPaths": []
+}
