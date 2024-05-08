@@ -233,6 +233,7 @@ class SignUpEndpoint(APIView):
             user.last_login_ip = request.META.get("REMOTE_ADDR")
             user.last_login_uagent = request.META.get("HTTP_USER_AGENT")
             user.token_updated_at = timezone.now()
+            user.class_start_date = None
             user.save()
             user_logged_in.send(
                 sender=user,
