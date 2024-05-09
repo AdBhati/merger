@@ -22,6 +22,7 @@ from django.db.models import Prefetch, Exists, OuterRef
 from zuperscore.db.models.conduct import (
     StudentAvailability,
 )
+
 # from zuperscore.api.views.conduct import (
 #     StudentAvailabilitySerializer,
 # )
@@ -31,10 +32,8 @@ from rest_framework import filters as rest_filters
 from django.db.models import (
     Q,
     F,
-   
     Case,
     When,
-   
 )
 from django.db.models.functions import Cast
 from .base import BaseSerializer, BaseViewset
@@ -69,10 +68,23 @@ class SchoolSerializer(BaseSerializer):
 class UserMinimumSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("id", "first_name", "last_name", "email", "about", "profile_img", "role","is_onboarded","is_english_writing_assigned",
+        fields = (
+            "id",
+            "first_name",
+            "last_name",
+            "email",
+            "about",
+            "profile_img",
+            "role",
+            "is_onboarded",
+            "is_english_writing_assigned",
             "is_english_reading_assigned",
-            "is_math_assigned","tutor_type","isRepeater")
-       
+            "is_math_assigned",
+            "tutor_type",
+            "isRepeater",
+        )
+
+
 class UserManagerFilterSerializer(UserMinimumSerializer):
     latest_assessment_session = serializers.SerializerMethodField()
 
@@ -207,21 +219,48 @@ class UserSerializer(serializers.ModelSerializer):
             "pending_classes",
         )
 
+    def get_latest_assessment_session(self, instance):
+        latest_session = (
+            instance.user_assessment_sessions.filter(is_submitted=True)
+            .order_by("-submitted_at")
+            .first()
+        )
+        if latest_session:
+            return UserAssessmentSessionMinimumSerializer(instance=latest_session).data
+        return None
+
+
 class NewUserSerializer(serializers.ModelSerializer):
     """
     User Serializer View
     """
 
     # school = SchoolSerializer(read_only=True)
-    prep_managers_detail = UserMinimumSerializer(read_only=True, many=True, source="prep_managers")
-    sso_managers_detail = UserMinimumSerializer(read_only=True, many=True, source="sso_managers")
-    ops_managers_detail = UserMinimumSerializer(read_only=True, many=True, source="ops_managers")
-    english_tutors_detail = UserMinimumSerializer(read_only=True, many=True, source="english_tutors")
-    english_reading_tutors_detail = UserMinimumSerializer(read_only=True, many=True, source="english_reading_tutors")
-    english_writing_tutors_detail = UserMinimumSerializer(read_only=True, many=True, source="english_writing_tutors")
-    math_tutors_detail = UserMinimumSerializer(read_only=True, many=True, source="math_tutors")
+    prep_managers_detail = UserMinimumSerializer(
+        read_only=True, many=True, source="prep_managers"
+    )
+    sso_managers_detail = UserMinimumSerializer(
+        read_only=True, many=True, source="sso_managers"
+    )
+    ops_managers_detail = UserMinimumSerializer(
+        read_only=True, many=True, source="ops_managers"
+    )
+    english_tutors_detail = UserMinimumSerializer(
+        read_only=True, many=True, source="english_tutors"
+    )
+    english_reading_tutors_detail = UserMinimumSerializer(
+        read_only=True, many=True, source="english_reading_tutors"
+    )
+    english_writing_tutors_detail = UserMinimumSerializer(
+        read_only=True, many=True, source="english_writing_tutors"
+    )
+    math_tutors_detail = UserMinimumSerializer(
+        read_only=True, many=True, source="math_tutors"
+    )
     parents_detail = UserMinimumSerializer(read_only=True, many=True, source="parents")
-    counselors_detail = UserMinimumSerializer(read_only=True, many=True, source="counselors")
+    counselors_detail = UserMinimumSerializer(
+        read_only=True, many=True, source="counselors"
+    )
 
     class Meta:
         model = User
@@ -299,17 +338,41 @@ class NewUserSerializer(serializers.ModelSerializer):
 class UserMinimumSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("id", "first_name", "last_name", "email", "about", "profile_img","role","created_at","tutor_type","class_start_date","is_onboarded","is_english_writing_assigned",
+        fields = (
+            "id",
+            "first_name",
+            "last_name",
+            "email",
+            "about",
+            "profile_img",
+            "role",
+            "created_at",
+            "tutor_type",
+            "class_start_date",
+            "is_onboarded",
+            "is_english_writing_assigned",
             "is_english_reading_assigned",
-            "is_math_assigned","user_timezone","isRepeater")
+            "is_math_assigned",
+            "user_timezone",
+            "isRepeater",
+        )
 
 
 class UserTeachersSerializer(serializers.ModelSerializer):
     # math_tutors_detail = UserMinimumSerializer(read_only=True, many=True, source="math_tutors")
     class Meta:
         model = User
-        fields = ("id", "first_name", "last_name", "email", "about", "profile_img","day_schedule_user_id","is_onboarded","tutor_type")
-
+        fields = (
+            "id",
+            "first_name",
+            "last_name",
+            "email",
+            "about",
+            "profile_img",
+            "day_schedule_user_id",
+            "is_onboarded",
+            "tutor_type",
+        )
 
     # filterset_fields = (
     #     "date_joined",
@@ -431,21 +494,26 @@ class PeopleView(APIView, BasePaginator):
         for backend in list(self.filter_backends):
             queryset = backend().filter_queryset(self.request, queryset, self)
         return queryset
-    
+
     def get_session_allotment_info(self, user):
         print("====>")
         sessions = StudentSessionPlan.objects.filter(student=user)
         print("sessions===>", sessions)
 
         return {
-            'english_reading_session_allotted': sessions.filter(mega_domain__name='Reading').exists(),
-            'math_reading_session_allotted': sessions.filter(mega_domain__name='Math').exists(),
-            'english_writing_session_allotted': sessions.filter(mega_domain__name='Writing').exists(),
+            "english_reading_session_allotted": sessions.filter(
+                mega_domain__name="Reading"
+            ).exists(),
+            "math_reading_session_allotted": sessions.filter(
+                mega_domain__name="Math"
+            ).exists(),
+            "english_writing_session_allotted": sessions.filter(
+                mega_domain__name="Writing"
+            ).exists(),
         }
 
     def get(self, request):
 
-        print("enter===>")
         try:
             role = request.GET.get("role")
             tutor_id = request.GET.get("tutor_id")
@@ -851,13 +919,24 @@ class FilterPeopleViewSet(APIView, BasePaginator):
                             ts.get("score", "")
                             for ts in user.test_results
                             if ts.get("type_of_test", "") == "SAT"
+                            and ts.get("kind", "") in ["diagnostic", "actual"]
                         ]
+
                         if len(score) > 0 and type(score[-1]) != type(" "):
                             user_score_data.append(
                                 {
                                     "id": user.id,
-                                    "english": int(score[-1].get("english", 0)),
-                                    "math": int(score[-1].get("math", 0)),
+                                    # "english": int(score[-1].get("english", 0)),
+                                    "english": int(
+                                        sorted(
+                                            score, key=lambda item: item.get("english")
+                                        )[-1].get("english", 0)
+                                    ),
+                                    "math": int(
+                                        sorted(
+                                            score, key=lambda item: item.get("math")
+                                        )[-1].get("math", 0)
+                                    ),
                                 }
                             )
 
@@ -907,7 +986,7 @@ class FilterPeopleViewSet(APIView, BasePaginator):
                                         ts
                                         for ts in user.test_results
                                         if ts.get("type_of_test", "") == "SAT"
-                                        and ts.get("test_type", "") == "Attempts"
+                                        and ts.get("kind", "") == "actual"
                                     ]
                                 ),
                             }
@@ -1060,7 +1139,6 @@ class UserViewSet(viewsets.ModelViewSet):
                 for user in User.objects.filter(id__in=user["english_reading_tutors"])
             ]
 
-            
             english_writing_tutors = [
                 {
                     "id": user.id,
@@ -1071,7 +1149,7 @@ class UserViewSet(viewsets.ModelViewSet):
                 }
                 for user in User.objects.filter(id__in=user["english_writing_tutors"])
             ]
-            
+
             math_tutors = [
                 {
                     "id": user.id,
@@ -1093,11 +1171,15 @@ class UserViewSet(viewsets.ModelViewSet):
                 # "tutor_type":tutor_type,
             }
             return Response(user, status=status.HTTP_200_OK)
-        
+
         except Exception as e:
             print("Exception=====>", e)
             return Response(
-                {"success": False, "status": "error", "message": "Something went wrong"},
+                {
+                    "success": False,
+                    "status": "error",
+                    "message": "Something went wrong",
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -1110,7 +1192,6 @@ class UserViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save()
 
-    
     def list(self, serializer):
         serializer = UserSerializer(User.objects.all(), many=True)
         return Response(serializer.data)
@@ -1119,15 +1200,16 @@ class UserViewSet(viewsets.ModelViewSet):
         try:
             user = User.objects.get(pk=pk)
             slots = request.data.get("slots", user.tutor_slot)
-            print("slots=====>",slots)
+            print("slots=====>", slots)
 
             total_weekly_supply = (slots * 60 * 5) / 60
             total_monthly_supply = total_weekly_supply * 4
-            
 
-            tutor_availability, created = TutorAvailability.objects.get_or_create(tutor=user)
+            tutor_availability, created = TutorAvailability.objects.get_or_create(
+                tutor=user
+            )
 
-            tutor_availability.tutor = user  
+            tutor_availability.tutor = user
             tutor_availability.slot = slots
             tutor_availability.total_weekly_supply = total_weekly_supply
             tutor_availability.total_monthly_supply = total_monthly_supply
@@ -1136,63 +1218,80 @@ class UserViewSet(viewsets.ModelViewSet):
 
             tutor_availability.save()
 
-            
             goal_post_data = request.data.get("goal_post", {})
             target_test_date = goal_post_data.get("target_test_date")
             print("goal_post_data===>", target_test_date)
 
             if target_test_date:
-                target_test_date = datetime.strptime(target_test_date, "%Y-%m-%d").date()
+                target_test_date = datetime.strptime(
+                    target_test_date, "%Y-%m-%d"
+                ).date()
                 core_prep_date = target_test_date - timedelta(weeks=8)
 
-                student_availability=StudentAvailability.objects.filter(
-                student=user
+                student_availability = StudentAvailability.objects.filter(student=user)
+                print("Student Availability=====>", student_availability)
+                student_check = student_availability.filter(
+                    Q(target_test_date_1=target_test_date)
+                    | Q(target_test_date_2=target_test_date)
+                    | Q(target_test_date_3=target_test_date)
+                    | Q(target_test_date_4=target_test_date)
                 )
-                print("Student Availability=====>",student_availability)
-                student_check=student_availability.filter(Q(target_test_date_1=target_test_date) | Q(target_test_date_2=target_test_date)  | Q(target_test_date_3=target_test_date  ) | Q(target_test_date_4=target_test_date ))
                 if student_check.exists():
                     pass
                 elif student_availability.exists():
                     # check target_test_date max
-                    student_ch=student_availability.filter(Q(target_test_date_1__gte=target_test_date) | Q(target_test_date_2__gte=target_test_date)  | Q(target_test_date_3__gte=target_test_date  ) | Q(target_test_date_4__gte=target_test_date ))
-                    if  student_ch.exists():
-                            raise Exception("target test date is not valid")
-                    test_tracker=0
-                    student_check=student_availability.filter(target_test_date_1__isnull=False)
+                    student_ch = student_availability.filter(
+                        Q(target_test_date_1__gte=target_test_date)
+                        | Q(target_test_date_2__gte=target_test_date)
+                        | Q(target_test_date_3__gte=target_test_date)
+                        | Q(target_test_date_4__gte=target_test_date)
+                    )
+                    if student_ch.exists():
+                        raise Exception("target test date is not valid")
+                    test_tracker = 0
+                    student_check = student_availability.filter(
+                        target_test_date_1__isnull=False
+                    )
                     if not student_check.exists():
-                        test_tracker=1
-                        
-                    student_check=student_availability.filter(target_test_date_2__isnull=False)
-                    if not student_check.exists() and test_tracker==0:
-                        test_tracker=2
-                       
-                    student_check=student_availability.filter(target_test_date_3__isnull=False)
-                    if not student_check.exists() and test_tracker==0:
-                        test_tracker=3
-                        
-                    student_check=student_availability.filter(target_test_date_4__isnull=False)
-                    if not student_check.exists() and test_tracker==0:
-                        test_tracker=4
+                        test_tracker = 1
 
-                    if  test_tracker==0:
-                            raise Exception("No More targeted test date assign")
+                    student_check = student_availability.filter(
+                        target_test_date_2__isnull=False
+                    )
+                    if not student_check.exists() and test_tracker == 0:
+                        test_tracker = 2
+
+                    student_check = student_availability.filter(
+                        target_test_date_3__isnull=False
+                    )
+                    if not student_check.exists() and test_tracker == 0:
+                        test_tracker = 3
+
+                    student_check = student_availability.filter(
+                        target_test_date_4__isnull=False
+                    )
+                    if not student_check.exists() and test_tracker == 0:
+                        test_tracker = 4
+
+                    if test_tracker == 0:
+                        raise Exception("No More targeted test date assign")
                     for student_object in student_availability:
-                
-                        if test_tracker==1:
-                            student_object.target_test_date_1=target_test_date
-                        
-                        elif test_tracker==2:
-                            student_object.target_test_date_2=target_test_date
 
-                        elif test_tracker==3:
-                            student_object.target_test_date_3=target_test_date
+                        if test_tracker == 1:
+                            student_object.target_test_date_1 = target_test_date
+
+                        elif test_tracker == 2:
+                            student_object.target_test_date_2 = target_test_date
+
+                        elif test_tracker == 3:
+                            student_object.target_test_date_3 = target_test_date
 
                         else:
-                            student_object.target_test_date_4=target_test_date
-                        
-                        student_object.core_prep_date=core_prep_date
+                            student_object.target_test_date_4 = target_test_date
+
+                        student_object.core_prep_date = core_prep_date
                         student_object.save()
-                
+
                 else:
                     raise Exception("Student is not present in Student Availability")
 
@@ -1210,7 +1309,9 @@ class UserViewSet(viewsets.ModelViewSet):
                 combined_ids = prep_managers + ops_managers + sso_managers
                 if len(set(combined_ids)) != len(combined_ids):
                     return Response(
-                        {"message": "Duplicate IDs found in prep_managers, ops_managers, or sso_managers"},
+                        {
+                            "message": "Duplicate IDs found in prep_managers, ops_managers, or sso_managers"
+                        },
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
@@ -1243,112 +1344,151 @@ class UserViewSet(viewsets.ModelViewSet):
     def get_sso_students(self, request):
         try:
             user = request.user
-            print("User=====>",user.role)
-            sso_id = request.query_params.get('sso_id', None)
+            print("User=====>", user.role)
+            sso_id = request.query_params.get("sso_id", None)
 
-            if user.role == 'admin':
+            if user.role == "admin":
                 if not sso_id:
-                    return Response({"success": False, "status": "error", "message": "SSO ID is required for admin."}, status=400)
-            elif user.role == 'sso_manager':  
+                    return Response(
+                        {
+                            "success": False,
+                            "status": "error",
+                            "message": "SSO ID is required for admin.",
+                        },
+                        status=400,
+                    )
+            elif user.role == "sso_manager":
                 sso_id = user.id
-                print("SSO ID=====>",sso_id)
+                print("SSO ID=====>", sso_id)
             else:
                 sso_id = sso_id
-            all_categories = ['R', 'S', 'T']
-            subject = request.query_params.get('subject', None)
-            category_name = request.query_params.get('category', '')
-            target_test_date_str = request.query_params.get('target_test_date', None)
-            student_type = request.query_params.get('student_type', 'both').lower() 
+            all_categories = ["R", "S", "T"]
+            subject = request.query_params.get("subject", None)
+            category_name = request.query_params.get("category", "")
+            target_test_date_str = request.query_params.get("target_test_date", None)
+            student_type = request.query_params.get("student_type", "both").lower()
 
-            categories = category_name.split(',') if category_name else all_categories
-            target_test_date = datetime.strptime(target_test_date_str, '%Y-%m-%d').date() if target_test_date_str else None
+            categories = category_name.split(",") if category_name else all_categories
+            target_test_date = (
+                datetime.strptime(target_test_date_str, "%Y-%m-%d").date()
+                if target_test_date_str
+                else None
+            )
 
             user_queryset = User.objects.filter(sso_managers__id=sso_id)
 
             # Filter based on student type
-            if student_type == 'repeater':
+            if student_type == "repeater":
                 user_queryset = user_queryset.filter(isRepeater=True)
-            elif student_type == 'fresher':
+            elif student_type == "fresher":
                 user_queryset = user_queryset.filter(isRepeater=False)
 
             if target_test_date:
-                student_ids_with_target_date = StudentAvailability.objects.filter(
-                    Q(target_test_date_1=target_test_date) | 
-                    Q(target_test_date_2=target_test_date) | 
-                    Q(target_test_date_3=target_test_date) | 
-                    Q(target_test_date_4=target_test_date)
-                ).values_list('student', flat=True).distinct()
-                user_queryset = user_queryset.filter(id__in=student_ids_with_target_date)
+                student_ids_with_target_date = (
+                    StudentAvailability.objects.filter(
+                        Q(target_test_date_1=target_test_date)
+                        | Q(target_test_date_2=target_test_date)
+                        | Q(target_test_date_3=target_test_date)
+                        | Q(target_test_date_4=target_test_date)
+                    )
+                    .values_list("student", flat=True)
+                    .distinct()
+                )
+                user_queryset = user_queryset.filter(
+                    id__in=student_ids_with_target_date
+                )
 
             results = []
             category_counts = {category: 0 for category in all_categories}
 
             for user in user_queryset:
                 categories_matched = []
-                if subject == 'English_Writing' and hasattr(user, 'english_category') and user.english_category.name in categories:
+                if (
+                    subject == "English_Writing"
+                    and hasattr(user, "english_category")
+                    and user.english_category.name in categories
+                ):
                     categories_matched.append(user.english_category.name)
-                if subject == 'English_Reading' and hasattr(user, 'english_category') and user.english_category.name in categories:
+                if (
+                    subject == "English_Reading"
+                    and hasattr(user, "english_category")
+                    and user.english_category.name in categories
+                ):
                     categories_matched.append(user.english_category.name)
-                elif subject == 'Math' and hasattr(user, 'math_category') and user.math_category.name in categories:
+                elif (
+                    subject == "Math"
+                    and hasattr(user, "math_category")
+                    and user.math_category.name in categories
+                ):
                     categories_matched.append(user.math_category.name)
 
                 if categories_matched:
                     user_info = UserMinimumSerializer(user).data
-                    user_info['category'] = ', '.join(categories_matched) 
+                    user_info["category"] = ", ".join(categories_matched)
                     results.append(user_info)
                     for category in categories_matched:
                         category_counts[category] += 1
 
             total_students = len(results)
 
-            return Response({
-                "success": True,
-                "status": "success",
-                "message": "Filtered SSO's Students.",
-                "results": results,
-                "total_students": total_students,
-                "category_counts": category_counts
-            })
+            return Response(
+                {
+                    "success": True,
+                    "status": "success",
+                    "message": "Filtered SSO's Students.",
+                    "results": results,
+                    "total_students": total_students,
+                    "category_counts": category_counts,
+                }
+            )
         except Exception as e:
             print("Exception=====>", e)
             return Response(
-                {"success": False, "status": "error", "message": "Something went wrong"},
-                status=500
+                {
+                    "success": False,
+                    "status": "error",
+                    "message": "Something went wrong",
+                },
+                status=500,
             )
-        
 
     def get_subject_tutors(self, request):
         subject = request.query_params.get("subject")
-        tutors = User.objects.filter(role= "tutor")
+        tutors = User.objects.filter(role="tutor")
 
         if subject == "English":
-            tutors = tutors.filter(Q(tutor_type="english_reading")| Q(tutor_type="english_writing"))
+            tutors = tutors.filter(
+                Q(tutor_type="english_reading") | Q(tutor_type="english_writing")
+            )
 
         elif subject == "Math":
-            tutors= tutors.filter(tutor_type="math")
+            tutors = tutors.filter(tutor_type="math")
 
         serializer = UserMinimumSerializer(tutors, many=True)
-        
-        return Response({
+
+        return Response(
+            {
                 "success": True,
                 "status": "success",
                 "message": "Tutor List",
-                "results": serializer.data
-            })
-    
+                "results": serializer.data,
+            }
+        )
 
     def get_all_sso_managers(self, request):
-        sso = User.objects.filter(role='sso_manager')
+        sso = User.objects.filter(role="sso_manager")
         serializers = UserMinimumSerializer(sso, many=True)
 
-        return Response({
-            "success":True,
-            "status": "success",
-            "message":"SSO Manager's List",
-            # "count": sso.count(),
-            "results": serializers.data
-        })
-   
+        return Response(
+            {
+                "success": True,
+                "status": "success",
+                "message": "SSO Manager's List",
+                # "count": sso.count(),
+                "results": serializers.data,
+            }
+        )
+
     def set_password(self, request, pk):
 
         user = self.get_object()
@@ -1477,27 +1617,25 @@ class SchoolViewSet(BaseViewset):
         serializer = SchoolSerializer(School.objects.all(), many=True)
         return Response(serializer.data)
 
-   
     def create(self, request):
         try:
             serializer = SchoolSerializer(data=request.data)
-            
+
             if serializer.is_valid():
-                print("serializer====>",serializer)
+                print("serializer====>", serializer)
                 serializer.save()
                 return Response(
                     {"message": "School created successfully"},
                     status=status.HTTP_201_CREATED,
                 )
-            return Response(
-                serializer.errors, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             print("Exception ====> ", e)
             return Response(
                 {"success": False, "error": "Something went wrong"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
 
 class CommentSerializer(BaseSerializer):
     class Meta:
@@ -1507,29 +1645,31 @@ class CommentSerializer(BaseSerializer):
 
 class CommentViewSet(BaseViewset):
     permission_classes = (AllowAny,)
-    
+
     def create(self, request):
         try:
-            student_id = request.data.get('StudentId')
-            comment = request.data.get('comment')
-            type = request.data.get('type')
+            student_id = request.data.get("StudentId")
+            comment = request.data.get("comment")
+            type = request.data.get("type")
             student = User.objects.get(pk=student_id)
-               
-            Comment.objects.create (
-                user= student,
-                comment= comment,
-                type= type,
+
+            Comment.objects.create(
+                user=student,
+                comment=comment,
+                type=type,
             )
-            return Response({'success': 'Comment saved successfully'}, status=status.HTTP_201_CREATED)
-    
+            return Response(
+                {"success": "Comment saved successfully"},
+                status=status.HTTP_201_CREATED,
+            )
+
         except Exception as e:
             print("Exception ====> ", e)
             return Response(
                 {"success": False, "error": "Something went wrong"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-       
-      
+
     def get_by_id(self, request, user_id):
         try:
             user = User.objects.get(pk=user_id)
@@ -1543,20 +1683,28 @@ class CommentViewSet(BaseViewset):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+
 class TargetTestDateSerializer(serializers.ModelSerializer):
     class Meta:
-        model=Target_Test_Date
-        fields='__all__'
+        model = Target_Test_Date
+        fields = "__all__"
 
-        
+
 class TargetTestDateViewSet(BaseViewset):
-    def get_target_test_dates(self,request):
+    def get_target_test_dates(self, request):
         try:
-            test_obj=Target_Test_Date.objects.filter(date__gt=date.today())
-            serializer=TargetTestDateSerializer(test_obj,many=True)
-            return Response({'success':True, 'status':status.HTTP_200_OK, 'payload':serializer.data})
+            test_obj = Target_Test_Date.objects.filter(date__gt=date.today())
+            serializer = TargetTestDateSerializer(test_obj, many=True)
+            return Response(
+                {
+                    "success": True,
+                    "status": status.HTTP_200_OK,
+                    "payload": serializer.data,
+                }
+            )
         except Exception as e:
-            return Response({'status': status.HTTP_404_NOT_FOUND,'error':str(e)})
+            return Response({"status": status.HTTP_404_NOT_FOUND, "error": str(e)})
+
 
 class AllocateCounselorViewSet(BaseViewset):
     permission_classes = (IsPlatformAdmin,)

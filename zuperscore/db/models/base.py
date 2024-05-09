@@ -301,6 +301,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_math_assigned = models.BooleanField(default=False, null=True, blank=True)
     isRepeater = models.BooleanField(default=False, null=True, blank=True) #change the name
     tutor_slot = models.IntegerField(default=0) #change the name
+    last_ptm_date = models.DateField(null=True)
+    pending_classes = models.JSONField(null=True)
   
 
 
