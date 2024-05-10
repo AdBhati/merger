@@ -209,6 +209,7 @@ class SignUpEndpoint(APIView):
             mobile_number = request.data.get("mobile_number")
             email = request.data.get("email").strip().lower()
             password = request.data.get("password")
+            role = request.data.get('role')
             if User.objects.filter(email=email).exists():
                 return Response(
                     {
@@ -224,6 +225,7 @@ class SignUpEndpoint(APIView):
                 first_name=first_name,
                 last_name=last_name,
                 mobile_number=mobile_number,
+                role=role,
             )
 
             user.set_password(password)
