@@ -332,70 +332,20 @@ urlpatterns = [
             }
         ),
     ),
-    path(
-        "tags/mega-domain/",
-        MegaDomainViewSet.as_view(
-            {
-                "get": "list",
-            }
-        ),
-    ),
-    path(
-        "tags/mega-domain/<int:pk>/",
-        MegaDomainViewSet.as_view(
-            {
-                "get": "get_megaDomain",
-            }
-        ),
-    ),
-    path(
-        "tags/domain/",
-        DomainViewSet.as_view(
-            {
-                "get": "list",
-            }
-        ),
-    ),
-    path(
-        "tags/domain/<int:pk>/",
-        DomainViewSet.as_view(
-            {
-                "get": "get_domain",
-            }
-        ),
-    ),
-    path(
-        "tags/topic/",
-        TopicViewSet.as_view(
-            {
-                "get": "list",
-            }
-        ),
-    ),
-    path(
-        "tags/topic/<int:pk>/",
-        TopicViewSet.as_view(
-            {
-                "get": "get_topic",
-            }
-        ),
-    ),
-    path(
-        "tags/sub-topic/",
-        SubTopicViewSet.as_view(
-            {
-                "get": "list",
-            }
-        ),
-    ),
-    path(
-        "tags/sub-topic/<int:pk>/",
-        SubTopicViewSet.as_view(
-            {
-                "get": "get_subTopic",
-            }
-        ),
-    ),
+    path("tags/mega-domain/", MegaDomainViewSet.as_view({"get": "list", "post": "create"})),
+    path("tags/mega-domain/<int:pk>/", MegaDomainViewSet.as_view({"get": "get_by_id", "put": "update"})),
+    path("tags/domain/", DomainViewSet.as_view({"get": "list", "post": "create"})),
+    path("tags/domain/<int:pk>/", DomainViewSet.as_view({"get": "get_by_id", "put": "update"})),
+    path("tags/topic/", TopicViewSet.as_view({"get": "list", "post": "create"})),
+    path("tags/topic/<int:pk>/", TopicViewSet.as_view({"get": "get_by_id", "put": "update"})),
+    path("tags/sub-topic/", SubTopicViewSet.as_view({"get": "list", "post": "create"})),
+    path("tags/sub-topic/<int:pk>/", SubTopicViewSet.as_view({"get": "get_by_id", "put": "update"})),
+    path("tags/sub-topicId/<int:topic_id>/", SubTopicViewSet.as_view({"get": "get_by_topicId"})),
+    path("tags/session-plan/", SessionPlanViewSet.as_view({"get": "list", "post": "create"})),
+    path("tags/session-plan/<int:pk>/", SessionPlanViewSet.as_view({"get": "get_by_id", "put": "update"})),
+    path("tags/session-plan/tree/", SessionPlanViewSet.as_view({"get": "get_session_tree"})),
+    path("tags/session-plan/tree/<int:pk>/", SessionPlanViewSet.as_view({"get": "get_session_tree_by_id"})),
+
     path("tags/reason-for-error/", ReasonForErrorViewSet.as_view({"get": "list"})),
     path(
         "tags/reason-for-error/<int:pk>/",
