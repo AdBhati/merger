@@ -919,7 +919,7 @@ class FilterPeopleViewSet(APIView, BasePaginator):
                             ts.get("score", "")
                             for ts in user.test_results
                             if ts.get("type_of_test", "") == "SAT"
-                            and ts.get("kind", "") in ["diagnostic", "actual"]
+                            and ts.get("kind", "") in ["diagnostic", "actual", "outside_actual"]
                         ]
 
                         if len(score) > 0 and type(score[-1]) != type(" "):
