@@ -478,7 +478,7 @@ urlpatterns = [
     path("assignments/<int:pk>/", AssignmentViewSet.as_view({"get": "get_by_id", "put": "update"})),
     path("assignments/completed-all/<int:user_id>/", AssignmentViewSet.as_view({"get":"get_completed_assignments"})),
     path("assignments/questions/", AssignmentQuestionViewSet.as_view({"get": "list", "post": "create"})),
-    path("assignments/questions/<int:pk>/", AssignmentQuestionViewSet.as_view({"get": "get_by_id", "put": "update"})),
+    path("assignments/questions/<int:pk>/", AssignmentQuestionViewSet.as_view({"get": "get_by_id", "put": "update","delete": "delete"})),
     path("assignments/student-assignments/<int:pk>/", StudentAssignmentViewSet.as_view({"get": "get_by_student_id"})),
     # class appointments
     path("conduct/appointments/", AppointmentViewSet.as_view({"get": "list", "post": "create"})),

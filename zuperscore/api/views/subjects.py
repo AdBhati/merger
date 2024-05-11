@@ -2649,6 +2649,20 @@ class AssignmentQuestionViewSet(BaseViewset, BasePaginator):
                 {"success": False, "error": "Something went wrong"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        
+    def delete(self, request, pk):
+        print("enter")
+        try:
+            question = AssignmentQuestion.objects.get(pk=pk)
+            print("question===>",question)
+        except AssignmentQuestion.DoesNotExist:
+            return Response({"error": "AssignmentQuestion not found"}, status=status.HTTP_404_NOT_FOUND)
+        question_options = question.question_options.all()
+        print("question_options===>",question_options)
+        question_options.delete()
+
+        question.delete()
+        return Response({"success": True}, status=status.HTTP_204_NO_CONTENT)
 
 class StudentAssignmentSerializer(BaseSerializer):
 
