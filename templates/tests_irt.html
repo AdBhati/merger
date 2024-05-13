@@ -1,0 +1,120 @@
+{% extends 'base.html' %} {% load static %} {% block content %}
+<div class="container my-5">
+  <h5 class="mb-4">Assessment IRT</h5>
+  <div class="m-0 p-0 d-flex justify-content-between align-items-center">
+    <div>
+      <pre class="m-0 p-0">
+Assessment Id: {{ assessment.id }}
+Assessment Name: {{  assessment.name }}
+      </pre>
+    </div>
+    <div></div>
+  </div>
+
+  <form method="POST">
+    {% csrf_token %}
+    <div class="d-flex justify-content-between align-items-center pb-4">
+      <div class="w-100 pr-4">
+        <strong>English</strong>
+        <div class="py-2">
+          <div class="pb-1">Sigma</div>
+          <input
+            type="text"
+            name="english_sigma"
+            value="{{assessment.english_sigma}}"
+            class="w-100"
+          />
+        </div>
+        <div>
+          <div class="pb-1">x-bar</div>
+          <input
+            type="text"
+            name="english_xbar"
+            value="{{assessment.english_xbar}}"
+            class="w-100"
+          />
+        </div>
+      </div>
+      <div class="w-100 pl-4">
+        <strong>Math</strong>
+        <div class="py-2">
+          <div class="pb-1">Sigma</div>
+          <input
+            type="text"
+            name="math_sigma"
+            value="{{assessment.math_sigma}}"
+            class="w-100"
+          />
+        </div>
+        <div>
+          <div class="pb-1">x-bar</div>
+          <input
+            type="text"
+            name="math_xbar"
+            value="{{assessment.math_xbar}}"
+            class="w-100"
+          />
+        </div>
+      </div>
+    </div>
+
+    <div class="m-0 p-0">
+      <table class="table bordered">
+        <thead>
+          <tr>
+            <th>Section Id</th>
+            <!-- <th style="white-space: nowrap">Question Id</th> -->
+            <th style="white-space: nowrap">Question No</th>
+            <th>IRT A</th>
+            <th>IRT B</th>
+            <th>IRT C</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for question in questions %}
+          <tr>
+            <td>
+              <div>
+                {{ question.section }} (<small>{{ question.type }}</small>)
+              </div>
+              <small>{{ question.name }}</small>
+            </td>
+            <!-- <td>{{ question.question }}</td> -->
+            <td>{{ question.no }}</td>
+            <td>
+              <input
+                type="text"
+                id="irt_a-{{ question.question }}"
+                name="irt_a-{{ question.question }}"
+                value="{{question.irt_a}}"
+              />
+            </td>
+            <td>
+              <input
+                type="text"
+                id="irt_b-{{ question.question }}"
+                name="irt_b-{{ question.question }}"
+                value="{{question.irt_b}}"
+              />
+            </td>
+            <td>
+              <input
+                type="text"
+                id="irt_c-{{ question.question }}"
+                name="irt_c-{{ question.question }}"
+                value="{{question.irt_c}}"
+              />
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <button class="btn-primary btn-sm" type="submit">
+        Update IRT values
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock content %}

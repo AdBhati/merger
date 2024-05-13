@@ -1,0 +1,33 @@
+{% extends 'base.html' %} {% load static %} {% block content %}
+<div class="container mt-5">
+  <h5>Assessment session user scaled score</h5>
+
+  <div class="mt-4 mb-4">
+    <h6 class="mb-2">High Level Detail</h6>
+    <pre class="m-0 p-0">
+Assessment Session Id: {{ high_level_details.session_id }}
+Assessment Id: {{ high_level_details.assessment_id }}
+Assessment Name: {{  high_level_details.assessment_name }}
+User Id: {{ high_level_details.user_id }}
+User Name: {{ high_level_details.user_name }}
+    </pre>
+  </div>
+
+  <div>
+    <h6 class="mb-2">Scaled score Detail</h6>
+    <pre class="m-0 p-0">
+E Sigma Used : 80
+E X Bar Used: 610
+M Sigma Used : 80
+M X Bar Used: 680
+E Raw score: 38
+M Raw Score: 43
+E theta: -0.3899999999999997
+M theta: 3.7200000000000006
+English Scaled Score: 580
+Math Scaled Score: 800
+Total Scaled: 1380
+    </pre>
+  </div>
+</div>
+{% endblock content %}

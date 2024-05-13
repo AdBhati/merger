@@ -1,0 +1,18 @@
+{% extends 'base.html' %} {% load static %}  {% block content %}
+<div class="container mt-5">
+  <h1>Zuperscore IRT</h1>
+
+<h1>Questions and IRT Values</h1>
+<table>
+    {% for question in questions %}
+    <tr>
+        <td>{{ question.question_text }}</td>
+        <td>{{ question.sequence}}</td>
+        <td><input>{{ question.irt_a }}</input></td>
+        <td><input>{{ question.irt_b }}</input></td>
+        <td><input>{{ question.irt_c }}</input></td>
+   </tr>
+    {% endfor %}
+</table>
+</div>
+{% endblock content %}
