@@ -1220,6 +1220,14 @@ class UserViewSet(viewsets.ModelViewSet):
 
             goal_post_data = request.data.get("goal_post", {})
             target_test_date = goal_post_data.get("target_test_date")
+
+            class_start_date=request.data.get("class_start_date")#add
+            print("class_sart_date====>",class_start_date)#add
+            if class_start_date is not None and target_test_date is not None and class_start_date > target_test_date:#add
+                return Response(
+                        {"message": "class start date should not be greater than target test date"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )#add
             print("goal_post_data===>", target_test_date)
 
             if target_test_date:
@@ -1247,7 +1255,7 @@ class UserViewSet(viewsets.ModelViewSet):
                         | Q(target_test_date_4__gte=target_test_date)
                     )
                     if student_ch.exists():
-                        raise Exception("target test date is not valid")
+                        raise Response("Target Test Date is not valid")
                     test_tracker = 0
                     student_check = student_availability.filter(
                         target_test_date_1__isnull=False
@@ -1274,7 +1282,7 @@ class UserViewSet(viewsets.ModelViewSet):
                         test_tracker = 4
 
                     if test_tracker == 0:
-                        raise Exception("No More targeted test date assign")
+                        raise Response("No More targeted test date assign")
                     for student_object in student_availability:
 
                         if test_tracker == 1:
@@ -1293,7 +1301,7 @@ class UserViewSet(viewsets.ModelViewSet):
                         student_object.save()
 
                 else:
-                    raise Exception("Student is not present in Student Availability")
+                    raise Response("Student is not present in Student Availability")
 
             is_onboarded = request.data.get("onboarded")
             if is_onboarded is not None:
