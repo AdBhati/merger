@@ -612,7 +612,10 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 )
             
             appointment.is_completed = True
-            appointment.end_at = timezone.now().strftime("%Y-%m-%d %H:%M:%S")
+            western_time = pytz.timezone('Asia/Kolkata')
+            # datetime_in_eastern_time = western_time.localize(datetime.datetime.now())
+            appointment.end_at = western_time.localize(datetime.now())
+            print("appointment.end_at",appointment.end_at)
             appointment.save()
 
             return Response({'message': 'Feedback and molecules updated successfully.'}, status=status.HTTP_200_OK)
@@ -707,12 +710,17 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 appointment=last_completed_appointment, 
                 is_completed=True
             )
+            molecule=last_classes_agenda.values_list('molecule', flat=True)
 
-            home_assignment_status = StudentAssignment.objects.filter(
-                student_id=student_id, 
-                is_completed=True, 
-                type="HOME"
-            ).exists()
+            molecule_topic_subtopic=MoleculeTopicSubtopic.objects.filter(molecule_id__in=molecule)
+
+            home_assignment_status =StudentAssignment.objects.filter(subtopic__in=molecule_topic_subtopic.values_list('subtopic', flat=True),student_id=student_id,type="HOME",is_completed=True).exists()
+
+            # home_assignment_status = StudentAssignment.objects.filter(
+            #     student_id=student_id, 
+            #     is_completed=True, 
+            #     type="HOME"
+            # ).exists()
 
          
             appointment_serializer = NewAppointmentSerializer(last_completed_appointment)
@@ -759,10 +767,10 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
             appointments = appointments.filter(is_completed=False)
     
         if sort_order == 'asc':
-            appointments = appointments.filter(host_id=host_id).order_by('created_at')
+            appointments = appointments.filter(host_id=host_id).order_by('start_at')
 
         else :
-            appointments = appointments.filter(host_id=host_id).order_by('-created_at')
+            appointments = appointments.filter(host_id=host_id).order_by('-start_at')
 
         appointments = appointments.annotate(student_count=Count('student'))
         appointments = list(appointments)
@@ -1486,11 +1494,15 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 # Check for time overlap with a conservative duration estimate.
                 for appointment in same_day_appointments:
                     appointment_start = appointment.start_at
-
                     appointment_end = appointment_start + timedelta(minutes=int(appointment.duration) if appointment.duration else MAX_DURATION_MINUTES)
 
                     if (new_start_datetime < appointment_end and estimated_end_time > appointment_start):
                         return Response({"error": "The new appointment overlaps with an existing one."}, status=status.HTTP_400_BAD_REQUEST)
+                    
+                if appointment_type == 'group_class':
+                    existing_group_classes = Appointments.objects.filter(student=student, type='group_class',start_at__date=appointment_date,mega_domain=mega_domain,)
+                    if existing_group_classes.exists():
+                        return Response({"error": "You can only book one group class of the same mega domain at a time."}, status=status.HTTP_400_BAD_REQUEST)
 
             new_booking = Appointments.objects.create(
                 invitee_name=invitee_name,
@@ -3049,11 +3061,16 @@ class GroupClassesBaseViewSet(BaseViewset):
             .annotate(
                 total_events=Count('event_id',distinct=True),
                 total_students=Count('student', distinct=True),
-                events_list=Count('id')
+                events_list=Count('id'),
+                max_id=Max('id'),
             )
+            .order_by('-max_id')
         )
+
+        paginator = CustomPageNumberPagination()#add
+        paginated_students = paginator.paginate_queryset(grouped_events, request)#add
         response_data = {'events_list': []}
-        for group_event in grouped_events:
+        for group_event in paginated_students:
             events = (
                 StudentGroupEvents.objects
                 .filter(group_id=group_event['group_id'], sso=logged_in_user_sso)
@@ -3075,13 +3092,14 @@ class GroupClassesBaseViewSet(BaseViewset):
                 'events': list(events)
             }
             response_data['events_list'].append(group_info)
-        
-        return Response({
-                "success": True,
-                "status": "success",
-                "message": "Events List..!",
-                "result":response_data
-            })
+
+        response_data=paginator.get_paginated_response(response_data)#add
+        return Response(
+                # "success": True,
+                # "status": "success",
+                # "message": "Events List..!",
+                response_data.data
+            )
 
 
     def allot_group_classes(self, request):

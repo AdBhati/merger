@@ -1213,13 +1213,18 @@ class UserViewSet(viewsets.ModelViewSet):
             tutor_availability.slot = slots
             tutor_availability.total_weekly_supply = total_weekly_supply
             tutor_availability.total_monthly_supply = total_monthly_supply
-            # total_monthly_load = tutor_availability.total_weekly_load * 4
-            # tutor_availability.total_monthly_load = total_monthly_load
-
             tutor_availability.save()
 
             goal_post_data = request.data.get("goal_post", {})
             target_test_date = goal_post_data.get("target_test_date")
+
+            class_start_date = request.data.get("class_start_date")
+            print("class_start_date====>", class_start_date)
+            if class_start_date is not None and target_test_date is not None and class_start_date > target_test_date:
+                return Response(
+                    {"message": "class start date should not be greater than target test date"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             print("goal_post_data===>", target_test_date)
 
             if target_test_date:
@@ -1227,6 +1232,7 @@ class UserViewSet(viewsets.ModelViewSet):
                     target_test_date, "%Y-%m-%d"
                 ).date()
                 core_prep_date = target_test_date - timedelta(weeks=8)
+                print("core_prep_date==>", core_prep_date)
 
                 student_availability = StudentAvailability.objects.filter(student=user)
                 print("Student Availability=====>", student_availability)
@@ -1239,7 +1245,6 @@ class UserViewSet(viewsets.ModelViewSet):
                 if student_check.exists():
                     pass
                 elif student_availability.exists():
-                    # check target_test_date max
                     student_ch = student_availability.filter(
                         Q(target_test_date_1__gte=target_test_date)
                         | Q(target_test_date_2__gte=target_test_date)
@@ -1247,7 +1252,11 @@ class UserViewSet(viewsets.ModelViewSet):
                         | Q(target_test_date_4__gte=target_test_date)
                     )
                     if student_ch.exists():
-                        raise Exception("target test date is not valid")
+                        print("Target Test Date is not valid")
+                        return Response(
+                            {"message": "Target Test Date is not valid"},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
                     test_tracker = 0
                     student_check = student_availability.filter(
                         target_test_date_1__isnull=False
@@ -1274,7 +1283,10 @@ class UserViewSet(viewsets.ModelViewSet):
                         test_tracker = 4
 
                     if test_tracker == 0:
-                        raise Exception("No More targeted test date assign")
+                        return Response(
+                            {"message": "No More targeted test date assign"},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
                     for student_object in student_availability:
 
                         if test_tracker == 1:
@@ -1291,17 +1303,18 @@ class UserViewSet(viewsets.ModelViewSet):
 
                         student_object.core_prep_date = core_prep_date
                         student_object.save()
-
                 else:
-                    raise Exception("Student is not present in Student Availability")
+                    print("Student is not present in Student Availability")
 
             is_onboarded = request.data.get("onboarded")
+            print("is_onboarded", is_onboarded)
             if is_onboarded is not None:
                 user.is_onboarded = is_onboarded
                 user.save()
 
             serializer = UserSerializer(user, data=request.data, partial=True)
             if serializer.is_valid():
+                print("valid serializer")
                 prep_managers = request.data.get("prep_managers", [])
                 ops_managers = request.data.get("ops_managers", [])
                 sso_managers = request.data.get("sso_managers", [])
@@ -1316,6 +1329,7 @@ class UserViewSet(viewsets.ModelViewSet):
                     )
 
                 school_id = request.data.get("school")
+                print("school_id", school_id)
 
                 if school_id is not None:
                     try:
