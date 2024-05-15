@@ -19,20 +19,11 @@ DEFAULT_FILE_STORAGE = "django_s3_storage.storage.S3Storage"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql_psycopg2",
-        "NAME": "zuperscore_prod_db",
-        "USER": "postgres",
-        "PASSWORD": "m8XzbVnMfZSJfOHI6z2A",
-        "HOST": "zuperscore-production.ctdcxbtpmgmd.ap-south-1.rds.amazonaws.com",
+        "NAME": "d794dok8f3kr09",
+        "USER": "ub0qk6p680a24s",
+        "PASSWORD": "pf21442e0e59f502f8d8125d1434680f87bb0e15aa81d38a5bf8f3eabb474e2f1",
+        "HOST": "ec2-52-45-214-209.compute-1.amazonaws.com",
     }
-
-
-    # "default": {
-    #     "ENGINE": "django.db.backends.postgresql_psycopg2",
-    #     "NAME": "d5rhp1f2jpqd71",
-    #     "USER": "u3k2pafkhimndq",
-    #     "PASSWORD": "pd19dfecbe12e0cbd2ddd68cab4b5d453fc35190cc568541ec245838cf937c427",
-    #     "HOST": "ec2-44-213-9-110.compute-1.amazonaws.com",
-    # },
 }
 
 
