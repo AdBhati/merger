@@ -1199,7 +1199,7 @@ class UserViewSet(viewsets.ModelViewSet):
     def partial_update(self, request, pk):
         try:
             user = User.objects.get(pk=pk)
-            slots = request.data.get("slots", user.tutor_slot)
+            slots = request.data.get("slots", user.tutor_slot) 
             print("slots=====>", slots)
 
             total_weekly_supply = (slots * 60 * 5) / 60
@@ -1308,10 +1308,17 @@ class UserViewSet(viewsets.ModelViewSet):
                     print("Student is not present in Student Availability")
 
             is_onboarded = request.data.get("onboarded")
-            print("is_onboarded", is_onboarded)
+            day_schedule_user_id = request.data.get("day_schedule_user_id")
+            tutor_type = request.data.get("tutor_type")
+
             if is_onboarded is not None:
                 user.is_onboarded = is_onboarded
-                user.save()
+            if day_schedule_user_id is not None:
+                user.day_schedule_user_id = day_schedule_user_id
+            if tutor_type is not None:
+                user.tutor_type = tutor_type
+
+            user.save()
 
             serializer = UserSerializer(user, data=request.data, partial=True)
             if serializer.is_valid():
