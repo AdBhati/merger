@@ -257,10 +257,15 @@ urlpatterns = [
         AllocateManagerViewSet.as_view({"put": "partial_update"}),
     ),
     path(
+        "users/tutors-list",
+        UserViewSet.as_view({"get":"get_subject_tutors"}),
+    ),
+    path(
         "users/<int:pk>/setpassword/",
         UserViewSet.as_view({"post": "set_password"}),
         name="users",
     ),
+    path("users/sso-students", UserViewSet.as_view({"get": "get_sso_students"})),
     path(
         "users/assessments-sessions/",
         UserAssessmentSessionViewSet.as_view({"get": "list", "post": "create"}),

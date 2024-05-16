@@ -50,6 +50,7 @@ class StudentSessionPlan(TimeAuditModel):
     )
     corePrep = models.DateField(null=True)
     targetTest = models.DateField(null=True)
+    is_completed = models.BooleanField(default=False)
 
     class Meta:
         """Meta definition for StudentSessionPlan."""
@@ -267,6 +268,10 @@ class StudentQuestionOption(TimeAuditModel):
 
 
 class Appointments(TimeAuditModel):
+    STATUS_CHOICES = [
+        ('CANCELLED', 'Cancelled'),
+        ('RESCHEDULED', 'Rescheduled'),
+    ]
     host = models.ForeignKey(User, on_delete=models.CASCADE, related_name="host", null=False)  # tutor
     subject = models.ForeignKey(
         Subject, on_delete=models.CASCADE, null=True, blank=True, related_name="app_subject"
@@ -294,6 +299,7 @@ class Appointments(TimeAuditModel):
     ds_host_id = models.CharField(max_length=255, null=True)
     host_name = models.CharField(max_length=255, null=True)
     mega_domain = models.CharField(max_length=255, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES,null = True)
     
 
     class Meta:
