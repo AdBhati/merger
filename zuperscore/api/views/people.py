@@ -1217,6 +1217,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
             goal_post_data = request.data.get("goal_post", {})
             target_test_date = goal_post_data.get("target_test_date")
+            print("target_test_date===>", target_test_date)
 
             class_start_date = request.data.get("class_start_date")
             print("class_start_date====>", class_start_date)

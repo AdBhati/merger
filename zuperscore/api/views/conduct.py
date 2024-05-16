@@ -2886,12 +2886,13 @@ class CpeaBaseViewSet(BaseViewset):
     
     
     def get_student_cpea_report(self, request, student_id):
+            appointment_id = request.query_params.get("appointment_id")
             if request.user.role == "user":
                 # student_id = request.user.id
                 # print("student_id===>",student_id)
-                student_cpea_report = StudentCpeaReport.objects.filter(student=student_id)
+                student_cpea_report = StudentCpeaReport.objects.filter(student=student_id,appointment=appointment_id)
             else :
-                appointment_id = request.query_params.get("appointment_id")
+                
                 student_cpea_report = StudentCpeaReport.objects.filter(student=student_id, appointment=appointment_id)
             serializers = StudentCpeaReportSerializer(student_cpea_report, many=True)
             return Response({
