@@ -606,7 +606,7 @@ urlpatterns = [
         "allocate-counselor/<int:pk>/<int:user>/",
         AllocateCounselorViewSet.as_view({"delete": "delete"}),
     ),
-    path("cpea/override/<int:student_id>/<str:mega_domain>", CpeaOverRideViewSet.as_view({"put": "cpea_override"})),  # added after merger
+    path("cpea/override/<int:student_id>/<str:mega_domains>", CpeaOverRideViewSet.as_view({"put": "cpea_override"})),  # added after merger
     path("conduct/unatteneded/classes/", UnattendedClassesViewSet.as_view({"get": "list"})),
 
 ]

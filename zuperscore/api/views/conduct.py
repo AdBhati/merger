@@ -3361,23 +3361,22 @@ class ReportClassesViewSet(BaseViewset):
 
 class CpeaOverRideViewSet(BaseViewset): #added after merger
 
-    def cpea_override(self, request, student_id, mega_domain):
+    def cpea_override(self, request, student_id, mega_domains):
         is_completed = request.data.get('is_completed')
-        print("is_completed==>",is_completed)
-        mega_domain = MegaDomain.objects.filter(name=mega_domain).first()
-        print("mega_domain==>",mega_domain)
-        student_session_plan = StudentSessionPlan.objects.filter(student_id=student_id, mega_domain=mega_domain)
-        print("student_session_plan==>",student_session_plan)
-
-        student_session_plan.update(is_completed=is_completed)
-
-        serializer = StudentSessionPlanSerializer(student_session_plan, many=True)
+        print("is_completed==>", is_completed)
+        mega_domain_names = mega_domains.split(',')
+        mega_domain_objects = MegaDomain.objects.filter(name__in=mega_domain_names)        
+        student_session_plans = StudentSessionPlan.objects.filter(student_id=student_id, mega_domain__in=mega_domain_objects)
+        student_session_plans.update(is_completed=is_completed)
+        
+        serializer = StudentSessionPlanSerializer(student_session_plans, many=True)
+        
         return Response({
             "success": True,
             "status": "success",
-            "message": "Student session plan updated successfully.",
+            "message": "Student session plans updated successfully.",
             "data": serializer.data
-        }, status=status.HTTP_200_OK) 
+        }, status=status.HTTP_200_OK)
     
 
 class UnattendedClassesViewSet(BaseViewset):  #added after merging
