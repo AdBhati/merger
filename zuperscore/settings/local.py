@@ -21,7 +21,7 @@ DATABASES = {
 
     "default": {
         "ENGINE": "django.db.backends.postgresql_psycopg2",
-        "NAME": "merger-local",
+        "NAME": "zs-merger-local",
         "USER": "postgres",
         "PASSWORD": "1234",
         "HOST": "localhost",

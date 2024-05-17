@@ -50,7 +50,7 @@ class StudentSessionPlan(TimeAuditModel):
     )
     corePrep = models.DateField(null=True)
     targetTest = models.DateField(null=True)
-    is_completed = models.BooleanField(default=False)
+    is_completed = models.BooleanField(default=False)  # added after merging
 
     class Meta:
         """Meta definition for StudentSessionPlan."""
@@ -299,7 +299,7 @@ class Appointments(TimeAuditModel):
     ds_host_id = models.CharField(max_length=255, null=True)
     host_name = models.CharField(max_length=255, null=True)
     mega_domain = models.CharField(max_length=255, null=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES,null = True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES,null = True) # added after merging
     
 
     class Meta:
