@@ -17,8 +17,6 @@ EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FILE_STORAGE = "django_s3_storage.storage.S3Storage"
 
 DATABASES = {
-    
-
     "default": {
         "ENGINE": "django.db.backends.postgresql_psycopg2",
         "NAME": "zs-merger-local",
