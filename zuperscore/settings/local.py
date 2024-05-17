@@ -17,20 +17,14 @@ EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FILE_STORAGE = "django_s3_storage.storage.S3Storage"
 
 DATABASES = {
-    # "default": {
-    #     "ENGINE": "django.db.backends.postgresql_psycopg2",
-    #     "NAME": "d794dok8f3kr09",
-    #     "USER": "ub0qk6p680a24s",
-    #     "PASSWORD": "pf21442e0e59f502f8d8125d1434680f87bb0e15aa81d38a5bf8f3eabb474e2f1",
-    #     "HOST": "ec2-52-45-214-209.compute-1.amazonaws.com",
-    # },
+    
 
     "default": {
         "ENGINE": "django.db.backends.postgresql_psycopg2",
-        "NAME": "zuper_merger_local",
+        "NAME": "zs-merger-local",
         "USER": "postgres",
         "PASSWORD": "1234",
-        "HOST": "local",
+        "HOST": "localhost",
     },
     
 }
