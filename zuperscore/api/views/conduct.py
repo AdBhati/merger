@@ -833,15 +833,12 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
             if appointment_data['type'] == 'group_class':
                 appointment_data['student_count'] = len(appointment_resource_grouping_map.get(appointment_data['resource_id'], []))
 
-           
-            # print('tp tp tpye :: ', appointment.type)
-            # print('tp tp id :: ', appointment.id)
-            
-            
+
+            appointment_obj=AppointmentReport.objects.filter(appointment=appointment.id).first()
+            appointment_data['is_tutor_joined']=appointment_obj.is_tutor_joined if appointment_obj else False
+
             modified_appointments.append(appointment_data)
-        print("appointment_data=================>",modified_appointments)    
-            
-        
+         
         for app in modified_appointments:
             if app['type'] == 'group_class' and app['id'] in groupedAppointId:
                 app['student'] = appointment_resource_grouping_map[app['resource_id']]
@@ -1263,6 +1260,7 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
         all_student_tutors = list(english_reading_tutors) + list(english_writing_tutors) + list(math_tutors)
         
         subject_tutors = User.objects.filter(tutor_type=mega_domain.lower(), role='tutor', day_schedule_user_id__isnull=False)
+        print("subject_tutors==>",subject_tutors)
         
         # Find assigned tutor within student tutors
         assigned_tutor = None
@@ -1281,8 +1279,9 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
         for tutor in subject_tutors:
             print("tutors id is ===========>>>>",tutor.day_schedule_user_id)
             tutor_data_response = self.get_dayScheduler_resource_by_id(request, tutor.day_schedule_user_id)
-            # print("")
+            print("tutor_data_response==>",tutor_data_response)
             if tutor_data_response.status_code == 200:
+                print("status code")
                 tutor_data = tutor_data_response.data.get("users_list", [])
                 all_responses.append({
                     "tutors_detail": UserMinimumSerializer([tutor], many=True).data,
@@ -1389,8 +1388,6 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
             "user_id": tutor_id,
             "apiKey": "AOthHfwumTELV7qUslLHRNxeOpObRhvp"
         }
-
-        print("user_id====>", params["user_id"])
         # print("api key =======>",params)
         try: 
             response = requests.get(get_all_users_url, headers=headers, params=params)
@@ -1585,10 +1582,9 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
 #----------------------------------------------------------------
   
     def get_coming_classes(self, request, invitee_id):
-        print("enter==>")
+       
         try:
             bookings = Appointments.objects.filter(invitee_id=invitee_id).select_related('host')
-            print("Bookings===>", bookings)
             serializer = AppointmentSerializer(bookings, many=True)
             data = serializer.data
            
@@ -1635,6 +1631,7 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                     student_id=invitee_id,
                     type="HOME",
                 )
+                has_molecules = AppointmentMolecule.objects.filter(appointment__id=appointment.id).exists()
 
                 home_assignment_present = related_home_assignments.exists() 
                 home_assignment_count = len(related_home_assignments)
@@ -1650,6 +1647,7 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 appointment_data['is_student_filled_feedback'] = student_feedback_exists
                 appointment_data['is_tutor_filled_feedback'] = tutor_feedback_exists
                 appointment_data['home_assignment_present'] = home_assignment_present
+                appointment_data['has_molecules'] = has_molecules
 
             return Response({
                 "bookings": data,
@@ -2381,7 +2379,7 @@ class StudentAvailabilityViewSet(BaseViewset):
 
             student = User.objects.get(pk=student_id)
             user = User.objects.get(id=user_id)
-
+            role = 'TUTOR'
             # Perform the Day-Schedule ID check only for tutors
             if user.role == "tutor" and not user.day_schedule_user_id:
                 print("Enter")
@@ -2401,18 +2399,21 @@ class StudentAvailabilityViewSet(BaseViewset):
 
  
             elif user.role == "prep_manager":
+                role = 'PREP MANAGER'
                 student.prep_managers.add(user)
             elif user.role == "sso_manager":
+                role = 'SSO MANAGER'
                 student.sso_managers.add(user)
             elif user.role == "ops_manager":
+                role = 'OPS MANAGER'
                 student.ops_managers.add(user)
 
             student.save()
-
+            message = role + "assigned successfully..!!"
             return Response({
                     "success": True,
                     "status": "success",
-                    "message": "User assigned successfully.",
+                    "message": message,
                 }, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -2870,13 +2871,10 @@ class CpeaBaseViewSet(BaseViewset):
     
     
     def get_student_cpea_report(self, request, student_id):
-            appointment_id = request.query_params.get("appointment_id")
             if request.user.role == "user":
-                # student_id = request.user.id
-                # print("student_id===>",student_id)
-                student_cpea_report = StudentCpeaReport.objects.filter(student=student_id,appointment=appointment_id)
+                student_cpea_report = StudentCpeaReport.objects.filter(student=student_id)
             else :
-                
+                appointment_id = request.query_params.get("appointment_id")
                 student_cpea_report = StudentCpeaReport.objects.filter(student=student_id, appointment=appointment_id)
             serializers = StudentCpeaReportSerializer(student_cpea_report, many=True)
             return Response({
@@ -3141,15 +3139,12 @@ class GroupClassesBaseViewSet(BaseViewset):
         try:
             student_events = StudentGroupEvents.objects.filter(group_id=group_id).order_by('-created_at')
             student_ids = student_events.values_list('student', flat=True)
-            print("Student===>", student_ids)
             sso_id = student_events.first().sso_id
             group_subject = student_events.first().subject
 
             user_queryset = User.objects.filter(id__in=student_ids)
-            print("user_queryset==>",user_queryset)
 
             student_type = student_events.first().student.isRepeater
-            print("student_type==>",student_type)
 
             if student_type:
                 user_queryset = user_queryset.filter(isRepeater=True)
@@ -3157,7 +3152,6 @@ class GroupClassesBaseViewSet(BaseViewset):
                 user_queryset = user_queryset.filter(isRepeater=False)
 
             subject = student_events.first().subject
-            print("subject==>",subject)
             if subject == 'English':
                 user_queryset = user_queryset.filter(english_category__name__in=['R', 'S', 'T'])
             elif subject == 'Math':
@@ -3179,6 +3173,7 @@ class GroupClassesBaseViewSet(BaseViewset):
             category_counts = {category: 0 for category in ['R', 'S', 'T']}
 
             for user in user_queryset:
+                user_group_event_status=student_events.filter(student=user).first().is_sso_verified
                 categories_matched = []
                 if subject == 'English_Reading' or subject == 'English_Writing' or subject == 'English' and hasattr(user, 'english_category') and user.english_category.name in ['R', 'S', 'T']:
                     categories_matched.append(user.english_category.name)
@@ -3190,6 +3185,7 @@ class GroupClassesBaseViewSet(BaseViewset):
                     user_info = UserMinimumSerializer(user).data
                     user_info['category'] = ', '.join(categories_matched)
                     user_info['subject'] = subject
+                    user_info['is_sso_verified'] = user_group_event_status
                     results.append(user_info)
                     for category in categories_matched:
                         category_counts[category] += 1
