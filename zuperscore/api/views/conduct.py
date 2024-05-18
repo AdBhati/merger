@@ -2706,6 +2706,8 @@ class StudentDashBoardViewSet(BaseViewset):
             student_availabilities = self.get_student_availabilities(student_id)
             student = student_availabilities.first().student
             join_date = student.class_start_date
+            # student_availabilities[0].student.class_start_date
+            print("join_date",join_date)
             test_tracker = self.get_test_tracker(student_availabilities)
             course_end_date, exam_date = self.get_course_and_exam_dates(student_availabilities, test_tracker)
 
@@ -2733,14 +2735,19 @@ class StudentDashBoardViewSet(BaseViewset):
             )
 
             total_classes = self.calculate_total_classes(student_session_plans)
+            print("total_classes",total_classes)
             total_course_duration_days = (course_end_date - join_date).days
+            print("total_course_duration_days",total_course_duration_days)
             elapsed_duration_days = (date.today() - join_date).days
+            print("elapsed_duration_days",elapsed_duration_days)
 
             if elapsed_duration_days > total_course_duration_days:
                 elapsed_duration_days = total_course_duration_days
 
             proportion_of_course_elapsed = elapsed_duration_days / total_course_duration_days if total_course_duration_days > 0 else 0
+            print("Proportion of course elapsed", proportion_of_course_elapsed)
             expected_classes = max(0, proportion_of_course_elapsed * total_classes)
+            print("expected_classes==>",expected_classes)
             total_attended_classes = Appointments.objects.filter(
                 student_id=student_id,
                 is_completed=True,
@@ -2871,11 +2878,12 @@ class CpeaBaseViewSet(BaseViewset):
     
     
     def get_student_cpea_report(self, request, student_id):
-            if request.user.role == "user":
-                student_cpea_report = StudentCpeaReport.objects.filter(student=student_id)
-            else :
-                appointment_id = request.query_params.get("appointment_id")
+            appointment_id = request.query_params.get("appointment_id")
+            if appointment_id:
                 student_cpea_report = StudentCpeaReport.objects.filter(student=student_id, appointment=appointment_id)
+            else:
+                student_cpea_report = StudentCpeaReport.objects.filter(student=student_id)
+            
             serializers = StudentCpeaReportSerializer(student_cpea_report, many=True)
             return Response({
                 "sucess": True,
