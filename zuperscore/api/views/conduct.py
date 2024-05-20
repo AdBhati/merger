@@ -1606,7 +1606,7 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
 
                 appointment_id = appointment_data.get("id")
 
-                appointment = Appointments.objects.filter(id=appointment_id,is_completed=Truej).exclude(status__in=['CANCELLED', 'RESCHEDULED']).get()
+                appointment = Appointments.objects.filter(id=appointment_id,is_completed=True).exclude(status__in=['CANCELLED', 'RESCHEDULED']).get()
                 if zoom_link:
                     appointment.zoom_link = zoom_link
                     appointment.title = subject
