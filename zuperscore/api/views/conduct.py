@@ -564,11 +564,8 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
 
             user_type = request.user.role
             commenter_type = 'tutor' if user_type == 'tutor' else 'user'
-            print("User type:", user_type)
-            # not_covered_messages =[]
-
+           
             if user_type == 'tutor':
-            # Mark molecules as completed based on tutor's input
                 for molecule_id in molecules_data:
                     AppointmentMolecule.objects.update_or_create(
                         appointment=appointment,
@@ -579,16 +576,12 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
 
                 molecules_data_str = list(map(str, molecules_data))
 
-                # Fetch all molecules related to this appointment
                 appointment_molecules = AppointmentMolecule.objects.filter(appointment=appointment)
 
                 for molecule in appointment_molecules:
-                    print("Molecule:", molecule.molecule_id)
 
                     if str(molecule.molecule_id) in molecules_data_str:
-                        # if not molecule.is_completed:
                             molecule.is_completed = True
-                            # molecule.save()
                     else:
                             molecule.is_completed = False
                     molecule.save()
@@ -612,10 +605,9 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 )
             
             appointment.is_completed = True
-            western_time = pytz.timezone('Asia/Kolkata')
-            # datetime_in_eastern_time = western_time.localize(datetime.datetime.now())
-            appointment.end_at = western_time.localize(datetime.now())
-            print("appointment.end_at",appointment.end_at)
+            if user_type == 'tutor':
+                western_time = pytz.timezone('Asia/Kolkata')
+                appointment.end_at = western_time.localize(datetime.now())
             appointment.save()
 
             return Response({'message': 'Feedback and molecules updated successfully.'}, status=status.HTTP_200_OK)
@@ -1155,13 +1147,13 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
         try:
             subject = request.query_params.get('subject', None)
             cpea = request.query_params.get('cpea', None)
+            slug = request.query_params.get('slug')
             print(f"Subject: {subject}")
             student = User.objects.get(pk=pk)
             serializer = UserSerializer(student)
             english_reading_tutors = student.english_reading_tutors.all()
             english_writing_tutors = student.english_writing_tutors.all()
             math_tutors = student.math_tutors.all()
-       
             
             if subject == 'math':
                 tutors = math_tutors
@@ -1180,6 +1172,7 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 if subject in ['math', 'english_reading', 'english_writing']:
                     tutors = tutors.filter(tutor_type=subject)
 
+
             print(f"Subject: {subject}")
             # print(f"Tutors====>: {UserBaseSerializer(tutors,many=True).data}")
 
@@ -1190,15 +1183,14 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
 
             tutor_data=[]
 
-        
             for tutor in tutors:
-                tutor_data_response = self.get_dayScheduler_resource_by_id(request, tutor.day_schedule_user_id)
+                tutor_data_response = self.get_dayScheduler_resource_by_id(request, tutor.day_schedule_user_id, slug)
                 if tutor_data_response.status_code == 200:
                     tutor_data = tutor_data_response.data.get("users_list", [])
                     
                     if cpea:
                         tutor_data = [event for event in tutor_data if 'CPEA' in event['name']]
-
+            
                         anonymized_tutor = [{
                         "id": tutor.id,
                         "first_name": f"Tutor {tutor_name_counter}",
@@ -1247,7 +1239,7 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
             )
         
     #Private Method
-    def admin_all_tutor_list(self, mega_domain, request, id):
+    def admin_all_tutor_list(self, mega_domain, request, id, slug):
         student = User.objects.get(pk=id)
         serializer = UserSerializer(student)
         
@@ -1256,13 +1248,10 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
         english_writing_tutors = student.english_writing_tutors.all()
         math_tutors = student.math_tutors.all()
         
-        # Combine all tutors into one list
         all_student_tutors = list(english_reading_tutors) + list(english_writing_tutors) + list(math_tutors)
         
         subject_tutors = User.objects.filter(tutor_type=mega_domain.lower(), role='tutor', day_schedule_user_id__isnull=False)
-        print("subject_tutors==>",subject_tutors)
         
-        # Find assigned tutor within student tutors
         assigned_tutor = None
         for tutor in all_student_tutors:
             if tutor in subject_tutors:
@@ -1278,18 +1267,23 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
 
         for tutor in subject_tutors:
             print("tutors id is ===========>>>>",tutor.day_schedule_user_id)
-            tutor_data_response = self.get_dayScheduler_resource_by_id(request, tutor.day_schedule_user_id)
-            print("tutor_data_response==>",tutor_data_response)
+            tutor_data_response = self.get_dayScheduler_resource_by_id(request, tutor.day_schedule_user_id, slug)
+            # print("")
             if tutor_data_response.status_code == 200:
-                print("status code")
                 tutor_data = tutor_data_response.data.get("users_list", [])
+
+                # if slug:
+                #     filtered_events = [event for event in tutor_data if slug in event['name']]
+                #     print("filtered events admin===>",filtered_events)
+                #     tutor_data = filtered_events
+
                 all_responses.append({
                     "tutors_detail": UserMinimumSerializer([tutor], many=True).data,
                     "tutor_id": tutor.day_schedule_user_id,
-                    "users_list": tutor_data[0]
+                    "users_list": tutor_data
                 })
-                
 
+                                
         return Response(
             {
                 "id": student.id,
@@ -1306,11 +1300,15 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
     def get_child(self, request, id):
         mega_domain = request.query_params.get('mega_domain', None)
         cpea = request.query_params.get('cpea', None)
+        slug = request.query_params.get('slug')
         print(f"Subject: {mega_domain}")
+        print(f"Slug: {slug}")
         print(f"cpea: {cpea}")
 
         if request.user.role == "admin":
-            return self.admin_all_tutor_list(mega_domain,request, id)
+            print("enter in")
+            print("Role is",request.user.role)
+            return self.admin_all_tutor_list(mega_domain, request, id,slug)
         
         student = User.objects.get(pk=id)
         # serializer = UserSerializer(student)
@@ -1320,7 +1318,6 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
         # tutor_data= None
 
         if mega_domain == 'math':
-            
             tutors = math_tutors
             print("enter in math")
         elif mega_domain == 'english_reading':
@@ -1343,7 +1340,8 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
         all_responses = []
 
         for tutor in tutors:
-            tutor_data_response = self.get_dayScheduler_resource_by_id(request, tutor.day_schedule_user_id)
+            tutor_data_response = self.get_dayScheduler_resource_by_id(request, tutor.day_schedule_user_id, slug)
+            print('response===>',tutor_data_response)
             if tutor_data_response.status_code == 200:
                 tutor_data = tutor_data_response.data.get("users_list", [])
                 
@@ -1373,34 +1371,38 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
     
     #----------------------------------------------------------------
     # day scheduler api to return all users link based on the Day-scheduler id
-    def get_dayScheduler_resource_by_id(self, request, tutor_id):
-
+    def get_dayScheduler_resource_by_id(self, request, tutor_id, slug):
         if not tutor_id:
-            return Response({"error": "Tutor DayScheduler ID is not provided or is invalid"}, status=400)
+            return Response({"error": "Tutor DayScheduler ID is not provided or is invalid"}, status=status.HTTP_400_BAD_REQUEST)
         
         get_all_users_url = "https://api.dayschedule.com/v1/resources"
-        # print("get_all_users_url==>",get_all_users_url)
+        headers = {"Content-Type": "application/json"}
 
-        headers = {
-            "Content-Type": "application/json",   
-        }
-        params ={
+        params = {
             "user_id": tutor_id,
             "apiKey": "AOthHfwumTELV7qUslLHRNxeOpObRhvp"
         }
-        # print("api key =======>",params)
-        try: 
+
+        try:
             response = requests.get(get_all_users_url, headers=headers, params=params)
+            
             if response.status_code == 200:
-                users_list = response.json().get("result",[])
-                # print("users_list==>",users_list)
+                users_list = response.json().get("result", [])
+                print("users_list===>", users_list)
+
+                if slug:
+                    filtered_events = [event for event in users_list if slug in event['slug']]
+                    print("filtered_events====>", filtered_events)
+                    users_list = filtered_events
+
                 return Response({"users_list": users_list})
-    
-            else :
-                return {"error": response.status_code}
+
+            else:
+                return Response({"error": response.status_code}, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
-            print("Error Occured:", e)
+            print("Error Occurred:", e)
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
      #----------------------------------------------------------------
 
@@ -1607,7 +1609,6 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                     appointment.save()
 
                 taught_molecules = AppointmentMolecule.objects.filter(appointment__id=appointment_id).values_list('molecule_id', flat=True)
-                
                 related_subtopics = MoleculeTopicSubtopic.objects.filter(molecule_id__in=taught_molecules).values_list('subtopic_id', flat=True)
                 
                 
@@ -1632,7 +1633,6 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                     type="HOME",
                 )
                 has_molecules = AppointmentMolecule.objects.filter(appointment__id=appointment.id).exists()
-
                 home_assignment_present = related_home_assignments.exists() 
                 home_assignment_count = len(related_home_assignments)
                 are_all_home_assignments_completed = len(completed_home_assignments)  == home_assignment_count
@@ -1660,7 +1660,6 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
         sort_order = self.request.query_params.get('order',None)
         subject_query = request.query_params.get('search', None)
 
-    
         appointments = Appointments.objects.filter(is_completed=True, student_id=student_id).exclude(status__in=['CANCELLED', 'RESCHEDULED']).order_by('created_at')
 
         if subject_query:
@@ -1679,18 +1678,14 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 student_feedback_exists = FeedBack.objects.filter(
                     Q(student=appointment.student.id),
                     appointment=appointment,
-                    # commenter='user',                
                 ).exists()
 
-                print("student_feedback_exists==>",student_feedback_exists)
                 
                 tutor_feedback_exists = FeedBack.objects.filter(
                     Q(tutor=appointment.host),
                     appointment=appointment,
-                    # commenter='tutor',
                 ).exists()
 
-                print("tutor_feedback_exists==>",tutor_feedback_exists)
                 
                 if student_feedback_exists and tutor_feedback_exists:
 
@@ -1709,8 +1704,6 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                         is_active=True
                     ).exists()
 
-                    print("has_home_assignments====>",has_home_assignments)
-
                     home_assignment_completed = StudentAssignment.objects.filter(
                         subtopic_id__in=related_subtopics,
                         student_id=student_id,
@@ -1719,7 +1712,6 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                         is_completed=True  
                     ).exists()
 
-                    print("home_assignment_completed==============>",home_assignment_completed)
 
                     appointment.home_assignment_present = has_home_assignments  #_Transient_field
                     appointment.home_assignment_completed = home_assignment_completed
@@ -3389,7 +3381,7 @@ class UnattendedClassesViewSet(BaseViewset):  #added after merging
         appointment_id = request.query_params.get('appointment_id',None)
         action = request.query_params.get('action', None)
 
-        if request.user.role.lower() == "sso manager":
+        if request.user.role.lower() == "sso_manager" or 'admin' or 'manager' or 'prep_manager':
 
             if appointment_id and action in ['cancel', 'reschedule']:
                 try:
@@ -3401,6 +3393,34 @@ class UnattendedClassesViewSet(BaseViewset):  #added after merging
                     return Response({"error": "Appointment not found"}, status=status.HTTP_404_NOT_FOUND)
         else:
             return Response({"error": "You do not have permission to cancel the class"}, status=status.HTTP_403_FORBIDDEN)
+        
+
+        
+    def counters_of_all_classes(self, request):    
+        current_time = datetime.now()
+        completed_classes = Appointments.objects.filter(is_completed=True,type__in=['cpea', 'coreprep', 'group_class']).count()
+        scheduled_classes = Appointments.objects.filter(start_at__gt=current_time, is_completed=False,type__in=['cpea', 'coreprep', 'group_class']).count()
+        student_no_show_classes = AppointmentReport.objects.filter(is_student_joined=False).count()
+        tutor_no_show_classes = AppointmentReport.objects.filter(is_tutor_joined = False).count()
+        total_no_show_classes = student_no_show_classes+tutor_no_show_classes
+        unattended_classes = AppointmentReport.objects.filter(
+            Q(is_student_joined=False) & Q(is_tutor_joined=False),
+        ).count()
+
+        cancelled_class = Appointments.objects.filter(status = 'CANCELED',type__in=['cpea', 'coreprep', 'group_class']).count()
+        reschedule_class = Appointments.objects.filter(status = 'RESCHEDULED',type__in=['cpea', 'coreprep', 'group_class']).count()
+            
+        return Response({
+                "success": True,
+                "status": "success",
+                "message": "Unattended classes reports....",
+                "schedule classes": scheduled_classes,
+                "complete classes": completed_classes,
+                "no show classes": total_no_show_classes,
+                "unattended classes":unattended_classes,
+                "canceled_classes":cancelled_class,
+                "reschedule_classes":reschedule_class
+            }, status=status.HTTP_201_CREATED)
                     
 
 
