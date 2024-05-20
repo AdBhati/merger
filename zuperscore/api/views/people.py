@@ -1238,7 +1238,7 @@ class UserViewSet(viewsets.ModelViewSet):
                 print("core_prep_date==>", core_prep_date)
 
                 # student_availability, created = StudentAvailability.objects.get_or_create(student=user)
-                print("Student Availability=====>", student_availability)
+                
                 student_availability=StudentAvailability.objects.filter(student=user).order_by('created_at').first()
                 created=None
                 if not student_availability:
