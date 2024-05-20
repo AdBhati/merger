@@ -1586,7 +1586,7 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
     def get_coming_classes(self, request, invitee_id):
        
         try:
-            bookings = Appointments.objects.filter(invitee_id=invitee_id).select_related('host')
+            bookings = Appointments.objects.filter(invitee_id=invitee_id).exclude(status__in=['CANCELLED', 'RESCHEDULED']).select_related('host')
             serializer = AppointmentSerializer(bookings, many=True)
             data = serializer.data
            
@@ -1602,13 +1602,13 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
 
                 appointment_id = appointment_data.get("id")
 
-                appointment = Appointments.objects.get(id=appointment_id)
+                appointment = Appointments.objects.filter(id=appointment_id).exclude(status__in=['CANCELLED', 'RESCHEDULED']).get()
                 if zoom_link:
                     appointment.zoom_link = zoom_link
                     appointment.title = subject
                     appointment.save()
 
-                taught_molecules = AppointmentMolecule.objects.filter(appointment__id=appointment_id).values_list('molecule_id', flat=True)
+                taught_molecules = AppointmentMolecule.objects.filter(appointment__id=appointment_id, is_completed=True).values_list('molecule_id', flat=True)
                 related_subtopics = MoleculeTopicSubtopic.objects.filter(molecule_id__in=taught_molecules).values_list('subtopic_id', flat=True)
                 
                 
@@ -3374,6 +3374,8 @@ class CpeaOverRideViewSet(BaseViewset): #added after merger
             "data": serializer.data
         }, status=status.HTTP_200_OK)
     
+   
+    
 
 class UnattendedClassesViewSet(BaseViewset):  #added after merging
 
@@ -3397,30 +3399,34 @@ class UnattendedClassesViewSet(BaseViewset):  #added after merging
 
         
     def counters_of_all_classes(self, request):    
-        current_time = datetime.now()
-        completed_classes = Appointments.objects.filter(is_completed=True,type__in=['cpea', 'coreprep', 'group_class']).count()
-        scheduled_classes = Appointments.objects.filter(start_at__gt=current_time, is_completed=False,type__in=['cpea', 'coreprep', 'group_class']).count()
-        student_no_show_classes = AppointmentReport.objects.filter(is_student_joined=False).count()
-        tutor_no_show_classes = AppointmentReport.objects.filter(is_tutor_joined = False).count()
-        total_no_show_classes = student_no_show_classes+tutor_no_show_classes
-        unattended_classes = AppointmentReport.objects.filter(
-            Q(is_student_joined=False) & Q(is_tutor_joined=False),
-        ).count()
+        student_id = request.query_params.get('student_id','None')
 
-        cancelled_class = Appointments.objects.filter(status = 'CANCELED',type__in=['cpea', 'coreprep', 'group_class']).count()
-        reschedule_class = Appointments.objects.filter(status = 'RESCHEDULED',type__in=['cpea', 'coreprep', 'group_class']).count()
-            
-        return Response({
+        if student_id:
+            current_time = datetime.now()
+            completed_classes = Appointments.objects.filter(is_completed=True,student_id=student_id,type__in=['cpea', 'coreprep', 'group_class']).count()
+            scheduled_classes = Appointments.objects.filter(start_at__gt=current_time, is_completed=False,student_id=student_id,type__in=['cpea', 'coreprep', 'group_class']).count()
+            student_no_show_classes = AppointmentReport.objects.filter(is_student_joined=False,appointment__student_id=student_id).count()
+            #tutor_no_show_classes = AppointmentReport.objects.filter(is_tutor_joined = False).count()
+           # total_no_show_classes = student_no_show_classes+tutor_no_show_classes
+           #unattended_classes = AppointmentReport.objects.filter(
+                #Q(is_student_joined=False) & Q(is_tutor_joined=False),
+            #).count()
+
+            cancelled_class = Appointments.objects.filter(status = 'CANCELED',student_id=student_id,type__in=['cpea', 'coreprep', 'group_class']).count()
+            reschedule_class = Appointments.objects.filter(status = 'RESCHEDULED',student_id=student_id,type__in=['cpea', 'coreprep', 'group_class']).count()
+            data = {"schedule classes": scheduled_classes,
+                    "complete classes": completed_classes,
+                    "no show classes": student_no_show_classes,
+                    "canceled classes":cancelled_class,
+                    "reschedule classes":reschedule_class,
+                    #"unattended classes":unattended_classes,
+                    }       
+            return Response({
                 "success": True,
                 "status": "success",
-                "message": "Unattended classes reports....",
-                "schedule classes": scheduled_classes,
-                "complete classes": completed_classes,
-                "no show classes": total_no_show_classes,
-                "unattended classes":unattended_classes,
-                "canceled_classes":cancelled_class,
-                "reschedule_classes":reschedule_class
-            }, status=status.HTTP_201_CREATED)
+                "message": "Class counters retrieved successfully",
+                "results": data
+            }, status=status.HTTP_200_OK)
                     
 
 
