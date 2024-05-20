@@ -3414,11 +3414,11 @@ class UnattendedClassesViewSet(BaseViewset):  #added after merging
 
             cancelled_class = Appointments.objects.filter(status = 'CANCELED',student_id=student_id,type__in=['cpea', 'coreprep', 'group_class']).count()
             reschedule_class = Appointments.objects.filter(status = 'RESCHEDULED',student_id=student_id,type__in=['cpea', 'coreprep', 'group_class']).count()
-            data = {"schedule classes": scheduled_classes,
-                    "complete classes": completed_classes,
-                    "no show classes": student_no_show_classes,
-                    "canceled classes":cancelled_class,
-                    "reschedule classes":reschedule_class,
+            data = {"scheduled_classes": scheduled_classes,
+                    "completed_classes": completed_classes,
+                    "no_show_classes": student_no_show_classes,
+                    "canceled_classes":cancelled_class,
+                    "reschedule_classes":reschedule_class,
                     #"unattended classes":unattended_classes,
                     }       
             return Response({
