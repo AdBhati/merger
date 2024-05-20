@@ -606,8 +606,12 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
             
             appointment.is_completed = True
             if user_type == 'tutor':
+                print("enter in tutor side")
+                print("saving in tutor side")
                 western_time = pytz.timezone('Asia/Kolkata')
                 appointment.end_at = western_time.localize(datetime.now())
+
+
             appointment.save()
 
             return Response({'message': 'Feedback and molecules updated successfully.'}, status=status.HTTP_200_OK)

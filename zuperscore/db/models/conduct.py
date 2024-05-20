@@ -306,15 +306,14 @@ class Appointments(TimeAuditModel):
 
     #added after merger
     def save(self, *args, **kwargs):
-        if self.is_completed and self.end_at:  
-            super().save(*args, **kwargs) 
-        elif self.is_completed and not self.end_at:  
-            if self.start_at:  
-                time_difference = timezone.now() - self.start_at
-                self.event_duration = int(time_difference.total_seconds() / 60)  
-            super().save(*args, **kwargs) 
-        else:
-            super().save(*args, **kwargs)  
+        if self.is_completed and self.start_at and self.end_at:
+            print("in if")
+            # Calculate event duration from start_at and end_at
+            time_difference = self.end_at - self.start_at
+            print("time_difference==>",time_difference)
+            self.event_duration = int(time_difference.total_seconds() / 60)  # Convert seconds to minutes
+            print("===>",self.event_duration)
+        super().save(*args, **kwargs)  
 
 class Attendee(TimeAuditModel):
     appointment = models.ForeignKey(Appointments, on_delete=models.CASCADE, related_name="appointments")
