@@ -1237,8 +1237,12 @@ class UserViewSet(viewsets.ModelViewSet):
                 core_prep_date = target_test_date - timedelta(weeks=8)
                 print("core_prep_date==>", core_prep_date)
 
-                student_availability, created = StudentAvailability.objects.get_or_create(student=user)
+                # student_availability, created = StudentAvailability.objects.get_or_create(student=user)
                 print("Student Availability=====>", student_availability)
+                student_availability=StudentAvailability.objects.filter(student=user).order_by('created_at').first()
+                created=None
+                if not student_availability:
+                    created=StudentAvailability.objects.create(student=user, target_test_date_1=target_test_date)
                 student_availability_obj = student_availability
 
                 student_check = StudentAvailability.objects.filter(
