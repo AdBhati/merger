@@ -564,11 +564,8 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
 
             user_type = request.user.role
             commenter_type = 'tutor' if user_type == 'tutor' else 'user'
-            print("User type:", user_type)
-            # not_covered_messages =[]
-
+           
             if user_type == 'tutor':
-            # Mark molecules as completed based on tutor's input
                 for molecule_id in molecules_data:
                     AppointmentMolecule.objects.update_or_create(
                         appointment=appointment,
@@ -579,16 +576,12 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
 
                 molecules_data_str = list(map(str, molecules_data))
 
-                # Fetch all molecules related to this appointment
                 appointment_molecules = AppointmentMolecule.objects.filter(appointment=appointment)
 
                 for molecule in appointment_molecules:
-                    print("Molecule:", molecule.molecule_id)
 
                     if str(molecule.molecule_id) in molecules_data_str:
-                        # if not molecule.is_completed:
                             molecule.is_completed = True
-                            # molecule.save()
                     else:
                             molecule.is_completed = False
                     molecule.save()
@@ -612,10 +605,9 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 )
             
             appointment.is_completed = True
-            western_time = pytz.timezone('Asia/Kolkata')
-            # datetime_in_eastern_time = western_time.localize(datetime.datetime.now())
-            appointment.end_at = western_time.localize(datetime.now())
-            print("appointment.end_at",appointment.end_at)
+            if user_type == 'tutor':
+                western_time = pytz.timezone('Asia/Kolkata')
+                appointment.end_at = western_time.localize(datetime.now())
             appointment.save()
 
             return Response({'message': 'Feedback and molecules updated successfully.'}, status=status.HTTP_200_OK)
@@ -1660,7 +1652,6 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
         sort_order = self.request.query_params.get('order',None)
         subject_query = request.query_params.get('search', None)
 
-    
         appointments = Appointments.objects.filter(is_completed=True, student_id=student_id).exclude(status__in=['CANCELLED', 'RESCHEDULED']).order_by('created_at')
 
         if subject_query:
@@ -1679,18 +1670,14 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 student_feedback_exists = FeedBack.objects.filter(
                     Q(student=appointment.student.id),
                     appointment=appointment,
-                    # commenter='user',                
                 ).exists()
 
-                print("student_feedback_exists==>",student_feedback_exists)
                 
                 tutor_feedback_exists = FeedBack.objects.filter(
                     Q(tutor=appointment.host),
                     appointment=appointment,
-                    # commenter='tutor',
                 ).exists()
 
-                print("tutor_feedback_exists==>",tutor_feedback_exists)
                 
                 if student_feedback_exists and tutor_feedback_exists:
 
@@ -1709,8 +1696,6 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                         is_active=True
                     ).exists()
 
-                    print("has_home_assignments====>",has_home_assignments)
-
                     home_assignment_completed = StudentAssignment.objects.filter(
                         subtopic_id__in=related_subtopics,
                         student_id=student_id,
@@ -1719,7 +1704,6 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                         is_completed=True  
                     ).exists()
 
-                    print("home_assignment_completed==============>",home_assignment_completed)
 
                     appointment.home_assignment_present = has_home_assignments  #_Transient_field
                     appointment.home_assignment_completed = home_assignment_completed

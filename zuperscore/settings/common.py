@@ -218,10 +218,12 @@ AWS_REGION = "ap-south-1"
 # The AWS access key to use.
 
 AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY')
+print('AWS_ACCESS_KEY_ID',AWS_ACCESS_KEY_ID)
 
 # The AWS secret access key to use.
 
 AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_KEY')
+print(AWS_SECRET_ACCESS_KEY)
 
 # The optional AWS session token to use.
 AWS_SESSION_TOKEN = ""

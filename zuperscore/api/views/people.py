@@ -332,6 +332,7 @@ class NewUserSerializer(serializers.ModelSerializer):
             "is_math_assigned",
             "tutor_type",
             "tutor_slot",
+            "day_schedule_user_id",
         )
 
 
@@ -355,6 +356,7 @@ class UserMinimumSerializer(serializers.ModelSerializer):
             "is_math_assigned",
             "user_timezone",
             "isRepeater",
+            "day_schedule_user_id",
         )
 
 
@@ -1484,10 +1486,11 @@ class UserViewSet(viewsets.ModelViewSet):
         subject = request.query_params.get("subject")
         tutors = User.objects.filter(role="tutor")
 
-        if subject == "English":
-            tutors = tutors.filter(
-                Q(tutor_type="english_reading") | Q(tutor_type="english_writing")
-            )
+        if subject == "English_Writing":
+            tutors = tutors.filter(tutor_type="english_writing")
+            
+        elif subject == "English_Reading":
+            tutors = tutors.filter(tutor_type="english_reading")
 
         elif subject == "Math":
             tutors = tutors.filter(tutor_type="math")
