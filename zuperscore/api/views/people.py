@@ -55,7 +55,7 @@ from zuperscore.db.models.base import School
 from zuperscore.db.models.assessments import UserAssessmentSession
 from rest_framework import serializers
 from rest_framework import viewsets
-from zuperscore.api.permissions.permissions import IsNotStudent, IsPlatformAdmin
+from zuperscore.api.permissions import *
 from rest_framework.exceptions import APIException
 
 
@@ -473,6 +473,7 @@ class UserTeachersSerializer(serializers.ModelSerializer):
 
 
 class PeopleView(APIView, BasePaginator):
+    permission_classes = (IsNotStudentOrGuest, ~IsTypist)
     filterset_fields = (
         "date_joined",
         "school",
@@ -511,6 +512,52 @@ class PeopleView(APIView, BasePaginator):
                 mega_domain__name="Writing"
             ).exists(),
         }
+
+    # def dispatch(self, request, *args, **kwargs):
+    #     missing_params = []
+    #     if isinstance(
+    #         request.user, IsTutor, IsUserManager, IsManager, IsParent, IsCounselor
+    #     ):
+    #         required_params = [
+    #             "tutorId",
+    #             "manager_id",
+    #             "parent_id",
+    #             "counselor_id",
+    #         ]  # Define required query parameters
+    #         missing_params += [
+    #             param for param in required_params if param not in request.query_params
+    #         ]
+
+    #     if len(missing_params) > 0:
+    #         return Response(
+    #             {"error": f"Missing query parameter(s): {', '.join(missing_params)}"},
+    #             status=400,
+    #         )
+    #     return super().dispatch(request, *args, **kwargs)
+    def dispatch(self, request, *args, **kwargs):
+        # Define roles and their corresponding required query parameters
+        role_params_mapping = {
+            "typist": ["tutor_id"],
+            "manager": ["manager_id"],
+            "parent": ["parent_id"],
+            "counselor": ["counselor"],
+        }
+
+        # Check if the user belongs to any of the roles in the mapping
+        user_role = request.user.role  # Implement a function to get user's role
+        if user_role in role_params_mapping:
+            required_params = role_params_mapping[user_role]
+            missing_params = [
+                param for param in required_params if param not in request.query_params
+            ]
+            if missing_params:
+                return Response(
+                    {
+                        "error": f"Missing query parameter(s) for role {user_role}: {', '.join(missing_params)}"
+                    },
+                    status=400,
+                )
+        return super().dispatch(request, *args, **kwargs)
 
     def get(self, request):
 
@@ -608,7 +655,7 @@ class PeopleView(APIView, BasePaginator):
 
 
 class FilterPeopleViewSet(APIView, BasePaginator):
-
+    permission_classes = (IsNotStudentOrGuest, ~IsTypist)
     search_fields = (
         "^first_name",
         "^last_name",
@@ -665,6 +712,31 @@ class FilterPeopleViewSet(APIView, BasePaginator):
 
         except Exception as e:
             print("this is error 2", e)
+
+    def dispatch(self, request, *args, **kwargs):
+        # Define roles and their corresponding required query parameters
+        role_params_mapping = {
+            "typist": ["tutor_id"],
+            "manager": ["manager_id"],
+            "parent": ["parent_id"],
+            "counselor": ["counselor"],
+        }
+
+        # Check if the user belongs to any of the roles in the mapping
+        user_role = request.user.role  # Implement a function to get user's role
+        if user_role in role_params_mapping:
+            required_params = role_params_mapping[user_role]
+            missing_params = [
+                param for param in required_params if param not in request.query_params
+            ]
+            if missing_params:
+                return Response(
+                    {
+                        "error": f"Missing query parameter(s) for role {user_role}: {', '.join(missing_params)}"
+                    },
+                    status=400,
+                )
+        return super().dispatch(request, *args, **kwargs)
 
     def post(self, request):
 
@@ -919,7 +991,8 @@ class FilterPeopleViewSet(APIView, BasePaginator):
                             ts.get("score", "")
                             for ts in user.test_results
                             if ts.get("type_of_test", "") == "SAT"
-                            and ts.get("kind", "") in ["diagnostic", "actual", "outside_actual"]
+                            and ts.get("kind", "")
+                            in ["diagnostic", "actual", "outside_actual"]
                         ]
 
                         if len(score) > 0 and type(score[-1]) != type(" "):
@@ -1561,6 +1634,14 @@ class UserViewSet(viewsets.ModelViewSet):
 
 
 class AllocateManagerViewSet(BaseViewset):
+    permission_classes = (
+        IsNotStudentOrGuest,
+        ~IsTypist,
+        ~IsParent,
+        ~IsCounselor,
+        ~IsTutor,
+    )
+
     def partial_update(self, request, pk):
         try:
             if request.user.is_active:
@@ -1604,12 +1685,15 @@ class AllocateManagerViewSet(BaseViewset):
 
 
 class UserCustomFieldViewSet(viewsets.ModelViewSet):
+    permission_classes = (IsNotStudentOrGuest, ~IsTypist)
+
     def list(self, serializer):
         serializer = UserMinimumSerializer(User.objects.all(), many=True)
         return Response(serializer.data)
 
 
 class SchoolViewSet(BaseViewset):
+    permission_classes = (~IsTypist,)
     serializer_class = SchoolSerializer
     model = School
 

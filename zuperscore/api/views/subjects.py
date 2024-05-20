@@ -19,12 +19,12 @@ from rest_framework import pagination
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as filters
 from rest_framework import filters as rest_filters
-from operator import itemgetter 
+from operator import itemgetter
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models.functions import Length
 
-#import date module by suresh
-from datetime import date,datetime
+# import date module by suresh
+from datetime import date, datetime
 from zuperscore.db.models.base import EnglishCategory, MathCategory, User
 from zuperscore.db.models.subjects import SubjectNode
 from zuperscore.db.models.library import (
@@ -56,7 +56,6 @@ from zuperscore.db.models.conduct import (
     StudentQuestionOption,
     Appointments,
     Attendee,
-
 )
 
 from zuperscore.db.models.base import (
@@ -66,10 +65,10 @@ from zuperscore.db.models.base import (
 
 from .base import BaseSerializer, BaseViewset
 from zuperscore.utils.paginator import BasePaginator
-
-
+from zuperscore.api.permissions import *
 from rest_framework import viewsets
 import json
+
 
 class SubjectNodeSerializer(BaseSerializer):
     class Meta:
@@ -86,6 +85,11 @@ class TreeMixin:
 
 
 class CreateSubjectTree(TreeMixin, APIView):
+    permission_classes = (
+        IsPlatformAdmin,
+        IsTypist,
+    )
+
     def post(self, request):
         title = request.data.get("title")
         kind = request.data.get("kind", "ROOT")
@@ -96,6 +100,11 @@ class CreateSubjectTree(TreeMixin, APIView):
 
 
 class SubjectTreeByNodeView(TreeMixin, APIView):
+    permission_classes = (
+        IsPlatformAdmin,
+        IsTypist,
+    )
+
     def get(self, request, node_id):
         root = self.get_node(node_id)
         tree = SubjectNode.dump_bulk(parent=root)
@@ -103,11 +112,21 @@ class SubjectTreeByNodeView(TreeMixin, APIView):
 
 
 class SubjectNodeViewset(viewsets.ModelViewSet):
+    permission_classes = (
+        IsPlatformAdmin,
+        IsTypist,
+    )
     serializer_class = SubjectNodeSerializer
     queryset = SubjectNode.objects.all()
 
 
 class AllSubjectRoots(APIView):
+    permission_classes = (
+        ~IsParent,
+        ~IsCounselor,
+        ~IsGuest,
+    )
+
     def get(self, request):
         state = request.GET.get("state")
         nodes = SubjectNode.get_root_nodes()
@@ -120,6 +139,10 @@ class AllSubjectRoots(APIView):
 
 
 class SubjectNodeActions(TreeMixin, APIView):
+    permission_classes = (
+        IsPlatformAdmin,
+        IsTypist,
+    )
 
     def post(self, request):
 
@@ -208,6 +231,7 @@ class ExamSerializer(BaseSerializer):
 
 
 class ExamViewSet(BaseViewset):
+    permission_classes = (~IsGuest,)
     serializer_class = ExamSerializer
     model = Exam
 
@@ -222,7 +246,18 @@ class SubjectSerializer(BaseSerializer):
         model = Subject
         fields = "__all__"
 
+
 class SubjectViewSet(BaseViewset):
+    permission_classes = (
+        read_only(IsGuest),
+        read_only(IsStudent),
+        read_only(IsParent),
+        read_only(IsCounselor),
+        read_only(IsUserManager),
+        IsPlatformAdmin,
+        IsTutor,
+        IsManager,
+    )
     serializer_class = SubjectSerializer
     model = Subject
 
@@ -263,14 +298,13 @@ class SubjectViewSet(BaseViewset):
 # mega domain
 class MegaDomainSerializer(BaseSerializer):
 
-    
     class Meta:
         model = MegaDomain
         fields = "__all__"
 
 
 class MegaDomainGetSerializer(BaseSerializer):
-    
+
     subject = SubjectSerializer(read_only=True)
 
     class Meta:
@@ -280,6 +314,16 @@ class MegaDomainGetSerializer(BaseSerializer):
 
 
 class MegaDomainViewSet(BaseViewset):
+    permission_classes = (
+        ~IsGuest,
+        read_only(IsStudent),
+        read_only(IsParent),
+        read_only(IsCounselor),
+        read_only(IsUserManager),
+        IsPlatformAdmin,
+        IsTutor,
+        IsManager,
+    )
     serializer_class = MegaDomainSerializer
     model = MegaDomain
 
@@ -307,30 +351,32 @@ class MegaDomainViewSet(BaseViewset):
 
     def list(self, request):
 
-
         name_filter = request.GET.get("name", None)
-        subject_filter = request.GET.get('subject', None)
+        subject_filter = request.GET.get("subject", None)
         megadomain_queryset = MegaDomain.objects.filter(is_active=True)
 
         if subject_filter:
-            megadomain_queryset = megadomain_queryset.filter(subject__name__icontains=subject_filter)
+            megadomain_queryset = megadomain_queryset.filter(
+                subject__name__icontains=subject_filter
+            )
 
         if name_filter:
-            megadomain_queryset = megadomain_queryset.filter(name__icontains=name_filter)
+            megadomain_queryset = megadomain_queryset.filter(
+                name__icontains=name_filter
+            )
 
         megadomain_queryset = megadomain_queryset.order_by("-created_at")
         serializer = MegaDomainGetSerializer(megadomain_queryset, many=True)
 
         # Return the response
-        return Response({
-            "success": True,
-            "status": "success",
-            "message": "",
-            "results": serializer.data,
-        })
-
-
-
+        return Response(
+            {
+                "success": True,
+                "status": "success",
+                "message": "",
+                "results": serializer.data,
+            }
+        )
 
     def get_by_id(self, request, pk):
         try:
@@ -438,17 +484,12 @@ class ModuleSerializer(BaseSerializer):
         fields = "__all__"
 
 
-
-
-
-
 class ModuleGetSerializer(BaseSerializer):
     mega_domain = MegaDomainGetSerializer(read_only=True)
 
     class Meta:
         model = Module
         fields = ["id", "name", "description", "sequence", "mega_domain"]
-
 
 
 class ModuleTreeSerializer(BaseSerializer):
@@ -466,7 +507,7 @@ class ModuleViewSet(BaseViewset):
 
     def list(self, request):
         mega_domain = request.GET.get("meag_domain")
-        print("mega_domain is:",mega_domain)
+        print("mega_domain is:", mega_domain)
         if mega_domain:
             serializer = ModuleGetSerializer(
                 Module.objects.filter(mega_domain=mega_domain).order_by("-created_at"),
@@ -586,7 +627,7 @@ class ModuleViewSet(BaseViewset):
 
 # domain
 class DomainSerializer(BaseSerializer):
-    
+
     class Meta:
         model = Domain
         fields = "__all__"
@@ -596,15 +637,33 @@ class DomainGetSerializer(BaseSerializer):
     # module = ModuleGetSerializer(read_only=True)
     mega_domain = MegaDomainSerializer()
     subject = SubjectSerializer()
-    
-
 
     class Meta:
         model = Domain
-        fields = ["id", "name", "description", "is_active", "sequence","mega_domain","subject"]
+        fields = [
+            "id",
+            "name",
+            "description",
+            "is_active",
+            "sequence",
+            "mega_domain",
+            "subject",
+        ]
 
 
 class DomainViewSet(BaseViewset):
+    
+    permission_classes = (
+        ~IsGuest,
+        read_only(IsStudent),
+        read_only(IsParent),
+        read_only(IsCounselor),
+        read_only(IsUserManager),
+        IsPlatformAdmin,
+        IsTutor,
+        IsManager,
+    )
+
     serializer_class = DomainSerializer
     model = Domain
 
@@ -642,7 +701,9 @@ class DomainViewSet(BaseViewset):
             domain_queryset = domain_queryset.filter(name__icontains=name_filter)
 
         if subject_filter:
-            domain_queryset = domain_queryset.filter(subject__name__icontains=subject_filter)
+            domain_queryset = domain_queryset.filter(
+                subject__name__icontains=subject_filter
+            )
 
         if module:
             domain_queryset = domain_queryset.filter(module=module)
@@ -651,15 +712,14 @@ class DomainViewSet(BaseViewset):
 
         serializer = DomainGetSerializer(domain_queryset, many=True)
 
-        return Response({
-            "success": True,
-            "status": "success",
-            "message": "",
-            "results": serializer.data,
-        })
-
-
-
+        return Response(
+            {
+                "success": True,
+                "status": "success",
+                "message": "",
+                "results": serializer.data,
+            }
+        )
 
     def get_by_id(self, request, pk):
         try:
@@ -759,6 +819,7 @@ class DomainViewSet(BaseViewset):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+
 # topic
 class TopicSerializer(BaseSerializer):
     class Meta:
@@ -781,21 +842,32 @@ class TopicGetSerializer(BaseSerializer):
 
 
 class TopicViewSet(BaseViewset):
+    permission_classes = (
+        ~IsGuest,
+        read_only(IsStudent),
+        read_only(IsParent),
+        read_only(IsCounselor),
+        read_only(IsUserManager),
+        IsPlatformAdmin,
+        IsTutor,
+        IsManager,
+    )
     serializer_class = TopicSerializer
     model = Topic
 
     def list(self, request):
         try:
-            topics = Topic.objects.all().order_by('id')
+            topics = Topic.objects.all().order_by("id")
             domain = request.GET.get("domain")
             name = request.GET.get("name")
-            total_records= None
+            total_records = None
 
             if domain:
                 serializer = TopicGetSerializer(
-                    Topic.objects.filter(domain=domain).order_by("-created_at"), many=True
+                    Topic.objects.filter(domain=domain).order_by("-created_at"),
+                    many=True,
                 )
-    
+
             elif name:
                 topics = topics.filter(Q(name__icontains=name))
                 serializer = TopicGetSerializer(topics, many=True)
@@ -804,8 +876,8 @@ class TopicViewSet(BaseViewset):
             else:
                 pass
 
-            page = request.GET.get('page')
-            page_size = request.GET.get('page_size', 10)
+            page = request.GET.get("page")
+            page_size = request.GET.get("page_size", 10)
             paginator = PageNumberPagination()
             paginator.page_size = page_size
 
@@ -819,13 +891,15 @@ class TopicViewSet(BaseViewset):
                 serializer = TopicGetSerializer(topics, many=True)
                 total_records = topics.count()
 
-            return Response({
-                "success": True,
-                "status": "success",
-                "message": "",
-                "Total_records": total_records,
-                "results": serializer.data,
-            })
+            return Response(
+                {
+                    "success": True,
+                    "status": "success",
+                    "message": "",
+                    "Total_records": total_records,
+                    "results": serializer.data,
+                }
+            )
         except Exception as e:
             print("Exception ====> ", e)
             return Response(
@@ -833,20 +907,16 @@ class TopicViewSet(BaseViewset):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-
-
-
         # else:
         #     serializer = TopicGetSerializer(
         #         Topic.objects.all().order_by("-created_at"), many=True
         #     )
-            
 
         # paginator = PageNumberPagination()
         # paginator.page_size = request.GET.get('page_size', 10)
         # paginated_assignments = paginator.paginate_queryset(topic, self.request)
 
-        # serializer = TopicGetSerializer(paginated_assignments, many=True) 
+        # serializer = TopicGetSerializer(paginated_assignments, many=True)
 
         # total_records = topic.count()
         # return Response(
@@ -858,7 +928,6 @@ class TopicViewSet(BaseViewset):
         #         "results": serializer.data,
         #     }
         # )
-    
 
     def get_by_id(self, request, pk):
         try:
@@ -940,8 +1009,6 @@ class TopicViewSet(BaseViewset):
             #     change_mega_domain = MegaDomain.objects.get(pk=mega_domain)
             #     existing_topic.mega_domain = change_mega_domain
 
-
-
             existing_topic.save()
             serializer = TopicSerializer(existing_topic)
 
@@ -985,20 +1052,32 @@ class SubTopicGetSerializer(BaseSerializer):
 
 
 class SubTopicViewSet(BaseViewset):
+    permission_classes = (
+        ~IsGuest,
+        read_only(IsStudent),
+        read_only(IsParent),
+        read_only(IsCounselor),
+        read_only(IsUserManager),
+        IsPlatformAdmin,
+        IsTutor,
+        IsManager,
+    )
     serializer_class = SubTopicSerializer
     model = SubTopic
 
     def list(self, request):
         try:
-            subtopics = SubTopic.objects.all().order_by('id')
+            subtopics = SubTopic.objects.all().order_by("id")
             domain_id = request.GET.get("domain_id")
             name = request.GET.get("name")
-            total_records= None
+            total_records = None
 
             if domain_id:
-                subtopics = SubTopic.objects.filter(topic__domain__id=domain_id).order_by("-created_at")
+                subtopics = SubTopic.objects.filter(
+                    topic__domain__id=domain_id
+                ).order_by("-created_at")
                 serializer = SubTopicGetSerializer(subtopics, many=True)
-            
+
             elif name:
                 subtopics = subtopics.filter(Q(name__icontains=name))
                 serializer = SubTopicGetSerializer(subtopics, many=True)
@@ -1006,9 +1085,9 @@ class SubTopicViewSet(BaseViewset):
 
             else:
                 pass
-                   
-            page = request.GET.get('page')
-            page_size = request.GET.get('page_size', 10)
+
+            page = request.GET.get("page")
+            page_size = request.GET.get("page_size", 10)
             paginator = PageNumberPagination()
             paginator.page_size = page_size
 
@@ -1021,20 +1100,21 @@ class SubTopicViewSet(BaseViewset):
                 serializer = SubTopicGetSerializer(subtopics, many=True)
                 total_records = subtopics.count()
 
-            return Response({
-                "success": True,
-                "status": "success",
-                "message": "",
-                "Total_records": total_records,
-                "results": serializer.data,
-            })
+            return Response(
+                {
+                    "success": True,
+                    "status": "success",
+                    "message": "",
+                    "Total_records": total_records,
+                    "results": serializer.data,
+                }
+            )
         except Exception as e:
-            print("Exception=====>",e)
-            return Response({"success":False, "error":"Something went wrong"},
-                            status=status.HTTP_400_BAD_REQUEST,)
-
-
-       
+            print("Exception=====>", e)
+            return Response(
+                {"success": False, "error": "Something went wrong"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
     def get_by_id(self, request, pk):
         try:
@@ -1061,7 +1141,6 @@ class SubTopicViewSet(BaseViewset):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-
     def get_by_topicId(self, request, topic_id):
         try:
             sub_topics = SubTopic.objects.filter(topic_id=topic_id)
@@ -1086,7 +1165,6 @@ class SubTopicViewSet(BaseViewset):
                 {"success": False, "error": "Something went wrong"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
 
     def create(self, request):
 
@@ -1170,6 +1248,7 @@ class SessionPlanSerializer(BaseSerializer):
         model = SessionPlan
         fields = "__all__"
 
+
 class GetSessionPlanSerializer(serializers.ModelSerializer):
     subject = SubjectSerializer()
     mega_domain = MegaDomainSerializer()
@@ -1177,7 +1256,7 @@ class GetSessionPlanSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SessionPlan
-        fields = '__all__'
+        fields = "__all__"
 
 
 class SessionPlanGetSerializer(BaseSerializer):
@@ -1443,7 +1522,7 @@ class StudentDomainSerializer(BaseSerializer):
 
 class StudentDomainViewSet(BaseViewset, BasePaginator):
     serializer = StudentDomainSerializer
-    model = StudentDomain 
+    model = StudentDomain
 
     def list(self, request):
         serializer = StudentDomainSerializer(StudentDomain.objects.all(), many=True)
@@ -1617,7 +1696,8 @@ class StudentModuleTreeSerializer(BaseSerializer):
             "student_domains",
         ]
 
-class NewMegaDomainSerializer(BaseSerializer): 
+
+class NewMegaDomainSerializer(BaseSerializer):
     domains = DomainSerializer(many=True, read_only=True)
 
     class Meta:
@@ -1637,7 +1717,6 @@ class StudentSessionPlanTreeSerializer(BaseSerializer):
     #     many=True, source="student_domain.all"
     # )
 
-
     class Meta:
         model = SessionPlan
         fields = [
@@ -1650,7 +1729,6 @@ class StudentSessionPlanTreeSerializer(BaseSerializer):
             "subject",
             "mega_domain",
             # "student_domains",
-
         ]
 
 
@@ -1731,14 +1809,17 @@ class StudentSessionViewSet(BaseViewset, BasePaginator):
                 Q(student=student_id) & Q(session_plan__in=session_plan_ids)
             ).exists():
                 return Response(
-                    {"success": False, "error": "This Session plan is already exists for this student"},
+                    {
+                        "success": False,
+                        "error": "This Session plan is already exists for this student",
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
             student = User.objects.get(id=student_id)
             sub_topic_time = ""
 
-            student_category = None   
+            student_category = None
             session_plans = SessionPlan.objects.filter(pk__in=session_plan_ids)
 
             student_session_plans = []
@@ -1747,24 +1828,23 @@ class StudentSessionViewSet(BaseViewset, BasePaginator):
             student_topics = []
             student_subtopics = []
             student_assignments = []
-            subtopics = [] #addding
+            subtopics = []  # addding
             student_assignment_questions = []
             student_question_options = []
 
             for session_plan in session_plans:
-                if session_plan.subject.name == 'English':
-                    student_category = student.english_category 
-                elif session_plan.subject.name == 'Math':
+                if session_plan.subject.name == "English":
+                    student_category = student.english_category
+                elif session_plan.subject.name == "Math":
                     student_category = student.math_category
 
-
-                if session_plan.mega_domain.name == 'Reading':
+                if session_plan.mega_domain.name == "Reading":
                     print("session plan mega_domain==>", session_plan.mega_domain.name)
                     english_reading_assigned = True
-                elif session_plan.mega_domain.name == 'Writing':
+                elif session_plan.mega_domain.name == "Writing":
                     english_writing_assigned = True
                     print("session plan mega_domain==>", session_plan.mega_domain.name)
-                elif session_plan.mega_domain.name == 'Math':
+                elif session_plan.mega_domain.name == "Math":
                     math_assigned = True
                     print("session plan mega_domain==>", session_plan.mega_domain.name)
 
@@ -1781,16 +1861,19 @@ class StudentSessionViewSet(BaseViewset, BasePaginator):
                 )
                 student_session_plans.append(student_session_plan)
 
-                
                 # creating student domains
-                mother_session_molecule = MotherSessionMolecule.objects.filter(session_plan=student_session_plan.session_plan).values_list('molecule_id',flat=True)
-                print("mother_session_molecule=========>",mother_session_molecule)
+                mother_session_molecule = MotherSessionMolecule.objects.filter(
+                    session_plan=student_session_plan.session_plan
+                ).values_list("molecule_id", flat=True)
+                print("mother_session_molecule=========>", mother_session_molecule)
 
-                molecule_ids = Molecule.objects.filter(pk__in=mother_session_molecule).values_list("domain_id",flat=True)
-                print("tempMoleculedomain=========>",molecule_ids)
+                molecule_ids = Molecule.objects.filter(
+                    pk__in=mother_session_molecule
+                ).values_list("domain_id", flat=True)
+                print("tempMoleculedomain=========>", molecule_ids)
 
                 domains = Domain.objects.filter(pk__in=molecule_ids, is_active=True)
-                print("tempdomains=========>",domains)
+                print("tempdomains=========>", domains)
 
                 # domains = Domain.objects.filter(mega_domain=session_plan.mega_domain,is_active=True)
                 # print("domains=======>",domains)
@@ -1804,14 +1887,18 @@ class StudentSessionViewSet(BaseViewset, BasePaginator):
                         domain=domain,
                         student=student,
                         student_session=student_session_plan,
-                        # mega_domain=domain.mega_domain 
+                        # mega_domain=domain.mega_domain
                     )
                     student_domains.append(student_domain)
-                        # creating student topics
-                    topics = Topic.objects.filter(domain=domain,is_active=True, moleculetopicsubtopic_id__molecule__id__in=mother_session_molecule).distinct()
+                    # creating student topics
+                    topics = Topic.objects.filter(
+                        domain=domain,
+                        is_active=True,
+                        moleculetopicsubtopic_id__molecule__id__in=mother_session_molecule,
+                    ).distinct()
                     # topic_id = MoleculeTopicSubtopic.objects.filter(molecule_id__in=molecule_ids).values_list('topic_id')
                     # topics = Topic.objects.filter(pk__in=topic_id,is_active=True)
-                    print("topics=======>",topics)
+                    print("topics=======>", topics)
                     # print("Enter in topic")
                     for topic in topics:
                         if MoleculeTopicSubtopic.objects.filter(topic=topic).exists():
@@ -1829,10 +1916,16 @@ class StudentSessionViewSet(BaseViewset, BasePaginator):
 
                             # subtopic_id = MoleculeTopicSubtopic.objects.filter(molecule_id__in=molecule_ids).values_list('subtopic_id')
                             # subtopics = Topic.objects.filter(pk__in=subtopic_id,is_active=True)
-                            subtopics = SubTopic.objects.filter(topic=topic,is_active=True, moleculetopicsubtopic_id__molecule__id__in=mother_session_molecule).distinct()
+                            subtopics = SubTopic.objects.filter(
+                                topic=topic,
+                                is_active=True,
+                                moleculetopicsubtopic_id__molecule__id__in=mother_session_molecule,
+                            ).distinct()
                         for subtopic in subtopics:
                             # print("non-filtered subtopic====>",subtopic)
-                            if MoleculeTopicSubtopic.objects.filter(subtopic=subtopic).exists():
+                            if MoleculeTopicSubtopic.objects.filter(
+                                subtopic=subtopic
+                            ).exists():
                                 student_subtopic = StudentSubTopic.objects.create(
                                     name=subtopic.name,
                                     description=subtopic.description,
@@ -1843,44 +1936,51 @@ class StudentSessionViewSet(BaseViewset, BasePaginator):
                                     sub_topic=subtopic,
                                     practice_sheet=subtopic.practice_sheet,
                                     student_topic=student_topic,
-                                    # mega_domain=domain.mega_domain 
+                                    # mega_domain=domain.mega_domain
                                 )
                                 # print("student_Subtopic====>",student_subtopics)
                             student_subtopics.append(student_subtopic)
 
-
                             # print("filter student_subtopics======>",student_subtopics)
-                            assignments = Assignment.objects.filter(subTopic = subtopic ,is_active=True)
+                            assignments = Assignment.objects.filter(
+                                subTopic=subtopic, is_active=True
+                            )
                             # print("print after assignment==== 1842>", assignments)
-                            # if len(assignments)<= 0:  
+                            # if len(assignments)<= 0:
                             #     print("success")
-                            
+
                             for assignment in assignments:
-                                check_molecule_topic_subtopic= MoleculeTopicSubtopic.objects.filter(subtopic=assignment.subTopic).exists()
+                                check_molecule_topic_subtopic = (
+                                    MoleculeTopicSubtopic.objects.filter(
+                                        subtopic=assignment.subTopic
+                                    ).exists()
+                                )
                                 # print("check_molecule_topic_subtopic===>", check_molecule_topic_subtopic)
-                                if check_molecule_topic_subtopic and assignment.category == student_category.name:
-                                # if assignment.category == student_category.name:
+                                if (
+                                    check_molecule_topic_subtopic
+                                    and assignment.category == student_category.name
+                                ):
+                                    # if assignment.category == student_category.name:
                                     # print("Matching category found for assignment")
                                     student_assignment = (
-                                    StudentAssignment.objects.create(
-                                        name=assignment.name,
-                                        description=assignment.description,
-                                        is_active=assignment.is_active,
-                                        marks=assignment.marks,
-                                        type=assignment.type,
-                                        subject=assignment.subject,
-                                        subtopic=assignment.subTopic,
-                                        assignment=assignment,
-                                        student=student,
-                                        megadomain=domain.mega_domain
+                                        StudentAssignment.objects.create(
+                                            name=assignment.name,
+                                            description=assignment.description,
+                                            is_active=assignment.is_active,
+                                            marks=assignment.marks,
+                                            type=assignment.type,
+                                            subject=assignment.subject,
+                                            subtopic=assignment.subTopic,
+                                            assignment=assignment,
+                                            student=student,
+                                            megadomain=domain.mega_domain,
                                         )
                                     )
-                                    
+
                                     student_assignments.append(student_assignment)
                                     assignment_questions = (
                                         AssignmentQuestion.objects.filter(
-                                            assignment=assignment,
-                                            is_active=True
+                                            assignment=assignment, is_active=True
                                         )
                                     )
 
@@ -1893,7 +1993,6 @@ class StudentSessionViewSet(BaseViewset, BasePaginator):
                                             is_active=assignment_question.is_active,
                                             sequence=assignment_question.sequence,
                                             # marks=assignment_question.marks,
-                                    
                                             type=assignment_question.type,
                                             student_assignment=student_assignment,
                                             student=student,
@@ -1907,7 +2006,7 @@ class StudentSessionViewSet(BaseViewset, BasePaginator):
                                         question_options = (
                                             QuestionOption.objects.filter(
                                                 questions=assignment_question,
-                                                is_active=True
+                                                is_active=True,
                                             )
                                         )
                                         for question_option in question_options:
@@ -1934,8 +2033,6 @@ class StudentSessionViewSet(BaseViewset, BasePaginator):
 
             student.save()
 
-                        
-
             return Response(
                 {
                     "success": True,
@@ -1944,14 +2041,17 @@ class StudentSessionViewSet(BaseViewset, BasePaginator):
                     "results": [],
                 }
             )
-          
+
         except Exception as e:
             print("Exception ====> ", e)
             return Response(
                 {"success": False, "error": "Something went wrong"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+
 ########################
+
 
 class MoleculeSerializer(BaseSerializer):
 
@@ -1959,22 +2059,20 @@ class MoleculeSerializer(BaseSerializer):
     mega_domain = MegaDomainSerializer()
     domain = DomainSerializer()
 
-
     class Meta:
         model = Molecule
         # fields = ['title', 'subject', 'mega_domain', 'domain', 'is_active']
-        fields = '__all__'
-
+        fields = "__all__"
 
 
 # Assignment
 class AssignmentSerializer(BaseSerializer):
     # subject = SubjectSerializer()
     subTopic = SubTopicSerializer()
+
     class Meta:
         model = Assignment
         fields = "__all__"
-
 
 
 class GetAssignmentSerializer(BaseSerializer):
@@ -1985,7 +2083,9 @@ class GetAssignmentSerializer(BaseSerializer):
 
     topic = TopicSerializer(source="assignment.subTopic.topic", read_only=True)
     domain = DomainSerializer(source="assignment.subTopic.topic.domain", read_only=True)
-    megaDomain = MegaDomainSerializer(source="assignment.subTopic.topic.domain.mega_domain", read_only=True)
+    megaDomain = MegaDomainSerializer(
+        source="assignment.subTopic.topic.domain.mega_domain", read_only=True
+    )
 
     class Meta:
         model = Assignment
@@ -2004,7 +2104,6 @@ class GetAssignmentSerializer(BaseSerializer):
             "assignment",
             "megaDomain",
         ]
-   
 
 
 class AssignmentQuestionSerializer(BaseSerializer):
@@ -2046,64 +2145,68 @@ class AssignmentQuestionGetSerializer(BaseSerializer):
             # "topic",
             # "domain",
             # "megaDomain",
-
-
         ]
+
+
 class CustomPagination(PageNumberPagination):
-        page_size = 10  # Display 10 items per page
-        page_size_query_param = 'page_size'  # Allow client to override the page size via query parameter
-        max_page_size = 100 
+    page_size = 10  # Display 10 items per page
+    page_size_query_param = (
+        "page_size"  # Allow client to override the page size via query parameter
+    )
+    max_page_size = 100
+
 
 class AssignmentViewSet(BaseViewset, BasePaginator):
 
     serializer = AssignmentSerializer
-    
+
     model = Assignment
-    fields=["id","name","description","marks","type","category","pdf_url"]
+    fields = ["id", "name", "description", "marks", "type", "category", "pdf_url"]
 
     filter_backends = [rest_filters.SearchFilter]
     # search_fields = ("name", "type", "category")
 
-    
     def list(self, request):
         try:
-            assignments = Assignment.objects.all().order_by('id')
+            assignments = Assignment.objects.all().order_by("id")
             # assignments = Assignment.objects.all().order_by(F('type').asc(), F('name').asc(),F('category').asc())
 
-            search_term = request.GET.get('search', None)
-            search_field = request.GET.get('search_field')
+            search_term = request.GET.get("search", None)
+            search_field = request.GET.get("search_field")
 
             # for search_term, search_field in zip(search_terms, search_fields):
-            if search_term :
-                if search_field == 'category':
+            if search_term:
+                if search_field == "category":
                     assignments = assignments.filter(category__icontains=search_term)
-                elif search_field == 'type':
+                elif search_field == "type":
                     assignments = assignments.filter(type__icontains=search_term)
-                elif search_field == 'name':
+                elif search_field == "name":
                     assignments = assignments.filter(name__icontains=search_term)
 
-            type_filter = request.GET.get('type', None)
+            type_filter = request.GET.get("type", None)
             if type_filter:
                 assignments = assignments.filter(type__icontains=type_filter)
 
-            category_filter = request.GET.get('category', None)
+            category_filter = request.GET.get("category", None)
             if category_filter:
                 assignments = assignments.filter(category__icontains=category_filter)
 
-            name_filter = request.GET.get('name', None)
+            name_filter = request.GET.get("name", None)
             if name_filter:
                 assignments = assignments.filter(name__icontains=name_filter)
 
             paginator = PageNumberPagination()
-            paginator.page_size = request.GET.get('page_size', 10)
-            paginated_assignments = paginator.paginate_queryset(assignments, self.request)
+            paginator.page_size = request.GET.get("page_size", 10)
+            paginated_assignments = paginator.paginate_queryset(
+                assignments, self.request
+            )
 
             serializer = GetAssignmentSerializer(paginated_assignments, many=True)
 
             assignment_data = []
 
             for assignment_serializer_data in serializer.data:
-                existing_assignment_id = assignment_serializer_data['id']
+                existing_assignment_id = assignment_serializer_data["id"]
                 existing_assignment = assignments.get(id=existing_assignment_id)
 
                 sub_topic_data = None
@@ -2117,14 +2220,18 @@ class AssignmentViewSet(BaseViewset, BasePaginator):
                     sub_topic_data = SubTopicSerializer(sub_topic).data
                     topic_data = TopicSerializer(sub_topic.topic).data
                     domain_data = DomainSerializer(sub_topic.topic.domain).data
-                    mega_domain_data = MegaDomainSerializer(sub_topic.topic.domain.mega_domain).data
+                    mega_domain_data = MegaDomainSerializer(
+                        sub_topic.topic.domain.mega_domain
+                    ).data
 
-                assignment_data.append({
-                    **assignment_serializer_data,
-                    "topic": topic_data,
-                    "domain": domain_data,
-                    "megaDomain": mega_domain_data,
-                })
+                assignment_data.append(
+                    {
+                        **assignment_serializer_data,
+                        "topic": topic_data,
+                        "domain": domain_data,
+                        "megaDomain": mega_domain_data,
+                    }
+                )
 
             total_records = assignments.count()
 
@@ -2145,7 +2252,6 @@ class AssignmentViewSet(BaseViewset, BasePaginator):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-
     def get_by_id(self, request, pk):
         try:
             existing_assignment = Assignment.objects.get(pk=pk)
@@ -2156,32 +2262,32 @@ class AssignmentViewSet(BaseViewset, BasePaginator):
             domain_data = None
             mega_domain_data = None
 
-           
             # if existing_assignment.assignment:
             #     assignment = existing_assignment.assignment
 
             if existing_assignment.subTopic:
                 sub_topic = existing_assignment.subTopic
 
-                   
                 sub_topic_data = SubTopicSerializer(sub_topic).data
                 topic_data = TopicSerializer(sub_topic.topic).data
                 domain_data = DomainGetSerializer(sub_topic.topic.domain).data
-                mega_domain_data = MegaDomainSerializer(sub_topic.topic.domain.mega_domain).data
+                mega_domain_data = MegaDomainSerializer(
+                    sub_topic.topic.domain.mega_domain
+                ).data
 
             return Response(
                 {
                     "success": True,
                     "status": "success",
                     "message": "",
-                    "results": [{
-                         **serializer.data,
-                         "topic": topic_data,
-                         "domain": domain_data,
-                         "megaDomain": mega_domain_data,
-                        
-                    }],
-                    
+                    "results": [
+                        {
+                            **serializer.data,
+                            "topic": topic_data,
+                            "domain": domain_data,
+                            "megaDomain": mega_domain_data,
+                        }
+                    ],
                 }
             )
         except Assignment.DoesNotExist:
@@ -2195,51 +2301,46 @@ class AssignmentViewSet(BaseViewset, BasePaginator):
                 {"success": False, "error": "Something went wrong"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
-
-        
 
     def create(self, request):
         try:
             existing_assignment = Assignment.objects.filter(
                 name__iexact=request.data.get("name")
             )
-            print("existing_assignment is:",existing_assignment)
+            print("existing_assignment is:", existing_assignment)
             if existing_assignment.exists():
                 return Response(
                     {"success": False, "error": "Assignment already exists"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            print("category is:",request.data.get("category"))
+            print("category is:", request.data.get("category"))
             subtopic_id = request.data.get("subtopic")
             subTopic = SubTopic.objects.get(pk=subtopic_id)
-            
+
             subject_id = request.data.get("subject")
             subject = Subject.objects.get(pk=subject_id)
-            
-
 
             assignment = Assignment.objects.create(
-                                        name=request.data.get("name"),
-                                        description=request.data.get("description"),
-                                        type=request.data.get("type"),
-                                        # sequence=request.data.get("sequence"),
-                                        subTopic=subTopic,
-                                        category=request.data.get("category"),
-                                        subject= subject,
-                                        pdf_url= request.data.get("pdf_url")
-                                    )
+                name=request.data.get("name"),
+                description=request.data.get("description"),
+                type=request.data.get("type"),
+                # sequence=request.data.get("sequence"),
+                subTopic=subTopic,
+                category=request.data.get("category"),
+                subject=subject,
+                pdf_url=request.data.get("pdf_url"),
+            )
 
             serializer = AssignmentSerializer(assignment)
 
             return Response(
-                    {
-                        "success": True,
-                        "status": "success",
-                        "message": "Assignment saved successfully.",
-                        "results":serializer.data
-                    }
-                )
+                {
+                    "success": True,
+                    "status": "success",
+                    "message": "Assignment saved successfully.",
+                    "results": serializer.data,
+                }
+            )
 
         except Exception as e:
             print("Exception ====> ", e)
@@ -2247,7 +2348,6 @@ class AssignmentViewSet(BaseViewset, BasePaginator):
                 {"success": False, "error": "Something went wrong"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
 
     def update(self, request, pk):
         try:
@@ -2267,11 +2367,17 @@ class AssignmentViewSet(BaseViewset, BasePaginator):
                 existing_assignment.is_active = is_active
 
             description = request.data.get("description")
-            if description is not None and existing_assignment.description != description:
+            if (
+                description is not None
+                and existing_assignment.description != description
+            ):
                 existing_assignment.description = description
 
             sub_topic_id = request.data.get("subtopic")
-            if sub_topic_id is not None and sub_topic_id != existing_assignment.subTopic_id:
+            if (
+                sub_topic_id is not None
+                and sub_topic_id != existing_assignment.subTopic_id
+            ):
                 change_sub_topic = SubTopic.objects.get(pk=sub_topic_id)
                 existing_assignment.subTopic = change_sub_topic
 
@@ -2279,16 +2385,13 @@ class AssignmentViewSet(BaseViewset, BasePaginator):
             # if sequence is not None and existing_assignment.sequence != sequence:
             #     existing_assignment.sequence = sequence
 
-
             type = request.data.get("type")
             if type is not None and existing_assignment.type != type:
                 existing_assignment.type = type
 
-
             category = request.data.get("category")
             if existing_assignment.category != category:
                 existing_assignment.category = category
-
 
             existing_assignment.save()
             serializer = AssignmentSerializer(existing_assignment)
@@ -2307,43 +2410,42 @@ class AssignmentViewSet(BaseViewset, BasePaginator):
                 {"success": False, "error": "Something went wrong"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
 
-
-        
     search_fields = ("subject__name",)
 
     filter_backends = (
         filters.DjangoFilterBackend,
         rest_filters.SearchFilter,
     )
-    
+
     pagination_class = CustomPagination()
-    
+
     def get_completed_assignments(self, request, user_id):
         try:
-            queryset = StudentAssignment.objects.filter(student_id=user_id, is_completed=True).order_by('-created_at')
+            queryset = StudentAssignment.objects.filter(
+                student_id=user_id, is_completed=True
+            ).order_by("-created_at")
             # print("queryset===>",queryset)
-            assignment_type = request.query_params.get('type', None)
+            assignment_type = request.query_params.get("type", None)
 
             # print("Assignment Type:", assignment_type)
             if assignment_type:
-                    queryset = queryset.filter(type__iexact=assignment_type) 
-                    queryset = queryset.annotate(
-                        assignment_length=Length('name')
-                    ).order_by('assignment_length', 'name')
-  
+                queryset = queryset.filter(type__iexact=assignment_type)
+                queryset = queryset.annotate(assignment_length=Length("name")).order_by(
+                    "assignment_length", "name"
+                )
+
             for backend in list(self.filter_backends):
                 print("==>")
                 queryset = backend().filter_queryset(request, queryset, self)
 
-                print("queryset====>",queryset)
-            
+                print("queryset====>", queryset)
+
             page = self.pagination_class.paginate_queryset(queryset, request, view=self)
             if page is not None:
                 serializer = NewStudentAssignmentSerializer(page, many=True)
                 return self.pagination_class.get_paginated_response(serializer.data)
-            
+
             serializer = NewStudentAssignmentSerializer(queryset, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -2354,10 +2456,11 @@ class AssignmentViewSet(BaseViewset, BasePaginator):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+
 class QuestionOptionSerializer(BaseSerializer):
     class Meta:
         model = QuestionOption
-        fields = ['id','name','is_active','is_correct','questions']
+        fields = ["id", "name", "is_active", "is_correct", "questions"]
 
 
 class AssignmentQuestionViewSet(BaseViewset, BasePaginator):
@@ -2372,31 +2475,35 @@ class AssignmentQuestionViewSet(BaseViewset, BasePaginator):
                 assignment=assignment_id
             ).order_by("-created_at")
 
-            
             for assignment_question in assignment_questions:
-                assignment_serializer = AssignmentQuestionGetSerializer(assignment_question)
-                question_options = assignment_question.question_options.all() 
-                question_option_data = QuestionOptionSerializer(question_options, many=True).data
-                
-                assignment_data.append({
-                    **assignment_serializer.data,
-                     "question_options": question_option_data
-                    
-                })
+                assignment_serializer = AssignmentQuestionGetSerializer(
+                    assignment_question
+                )
+                question_options = assignment_question.question_options.all()
+                question_option_data = QuestionOptionSerializer(
+                    question_options, many=True
+                ).data
+
+                assignment_data.append(
+                    {
+                        **assignment_serializer.data,
+                        "question_options": question_option_data,
+                    }
+                )
 
         return Response(
             {
                 "success": True,
                 "status": "success",
                 "message": "",
-                "results": assignment_data
+                "results": assignment_data,
             }
         )
+
     def get_by_id(self, request, pk):
         try:
             existing_question = AssignmentQuestion.objects.get(pk=pk)
             serializer = AssignmentQuestionGetSerializer(existing_question)
-            
 
             sub_topic_data = None
             topic_data = None
@@ -2405,41 +2512,42 @@ class AssignmentQuestionViewSet(BaseViewset, BasePaginator):
             assignment_data = None
             question_option_data = None
 
-           
             if existing_question.assignment:
-                assignment = existing_question.assignment    
+                assignment = existing_question.assignment
 
                 if assignment.subTopic:
                     sub_topic = assignment.subTopic
 
-        
                     sub_topic_data = SubTopicSerializer(sub_topic).data
                     topic_data = TopicSerializer(sub_topic.topic).data
                     domain_data = DomainGetSerializer(sub_topic.topic.domain).data
-                    mega_domain_data = MegaDomainSerializer(sub_topic.topic.domain.mega_domain).data
+                    mega_domain_data = MegaDomainSerializer(
+                        sub_topic.topic.domain.mega_domain
+                    ).data
                     assignment_data = GetAssignmentSerializer(assignment).data
-                    
 
                     question_options = existing_question.question_options.all()
-                    question_option_data = QuestionOptionSerializer(question_options, many=True).data
+                    question_option_data = QuestionOptionSerializer(
+                        question_options, many=True
+                    ).data
 
             return Response(
-            {
-                "success": True,
-                "status": "success",
-                "message": "",
-                "results": [
-                    {
-                        **serializer.data,
-                        "assignment": assignment_data,
-                        "topic": topic_data,
-                        "domain": domain_data,
-                        "megaDomain": mega_domain_data,
-                        "question_options": question_option_data,
-                    }
-                ],
-            }
-        )
+                {
+                    "success": True,
+                    "status": "success",
+                    "message": "",
+                    "results": [
+                        {
+                            **serializer.data,
+                            "assignment": assignment_data,
+                            "topic": topic_data,
+                            "domain": domain_data,
+                            "megaDomain": mega_domain_data,
+                            "question_options": question_option_data,
+                        }
+                    ],
+                }
+            )
         except AssignmentQuestion.DoesNotExist:
             return Response(
                 {"success": False, "error": "Question not found"},
@@ -2476,11 +2584,11 @@ class AssignmentQuestionViewSet(BaseViewset, BasePaginator):
 
             # exclude_keys = {'assignment', 'is_active'}
 
-            # if any((isinstance(value, str) and value.strip() == '' or value is None) for key, value in question.items() if type(value) in (bool, int) and key not in exclude_keys):   
+            # if any((isinstance(value, str) and value.strip() == '' or value is None) for key, value in question.items() if type(value) in (bool, int) and key not in exclude_keys):
             #     return Response(
             #         {"success": False, "error": "white space and null value not allowed."},
             #         status=status.HTTP_400_BAD_REQUEST,
-            #     )  
+            #     )
 
             new_question = AssignmentQuestion.objects.create(
                 name=question.get("name"),
@@ -2491,8 +2599,8 @@ class AssignmentQuestionViewSet(BaseViewset, BasePaginator):
                 explanation=question.get("explanation"),
                 passage=question.get("passage"),
                 remarks=question.get("remarks"),
-                enter_your_answer = question.get("enter_your_answer"),
-                sequence = question.get("sequence"),
+                enter_your_answer=question.get("enter_your_answer"),
+                sequence=question.get("sequence"),
                 assignment=assignment,
             )
 
@@ -2507,7 +2615,7 @@ class AssignmentQuestionViewSet(BaseViewset, BasePaginator):
                     questions=new_question,
                 )
                 option_list.append(model_to_dict(opt))
-            
+
             new_question_data = AssignmentQuestionGetSerializer(new_question).data
             new_question_data["question_options"] = option_list
 
@@ -2531,28 +2639,49 @@ class AssignmentQuestionViewSet(BaseViewset, BasePaginator):
             question = request.data
             options = question.get("options")
             existing_question = AssignmentQuestion.objects.get(pk=pk)
-            existing_options = QuestionOption.objects.filter(questions=existing_question)
+            existing_options = QuestionOption.objects.filter(
+                questions=existing_question
+            )
 
             # updating question
-            if question.get("name") is not None and existing_question.name != question.get("name"):
+            if question.get(
+                "name"
+            ) is not None and existing_question.name != question.get("name"):
                 existing_question.name = question.get("name")
-            if question.get("passage") is not None and existing_question.passage != question.get("passage"):
+            if question.get(
+                "passage"
+            ) is not None and existing_question.passage != question.get("passage"):
                 existing_question.passage = question.get("passage")
-            if question.get("sequence") is not None and existing_question.sequence != question.get("sequence"):
+            if question.get(
+                "sequence"
+            ) is not None and existing_question.sequence != question.get("sequence"):
                 existing_question.sequence = question.get("sequence")
-            if question.get("type") is not None and existing_question.type != question.get("type"):
+            if question.get(
+                "type"
+            ) is not None and existing_question.type != question.get("type"):
                 existing_question.type = question.get("type")
-            if question.get("explanation") is not None and existing_question.explanation != question.get("explanation"):
+            if question.get(
+                "explanation"
+            ) is not None and existing_question.explanation != question.get(
+                "explanation"
+            ):
                 existing_question.explanation = question.get("explanation")
-            if question.get("remarks") is not None and existing_question.remarks != question.get("remarks"):
+            if question.get(
+                "remarks"
+            ) is not None and existing_question.remarks != question.get("remarks"):
                 existing_question.remarks = question.get("remarks")
 
-            if question.get("enter_your_answer") is not None and existing_question.enter_your_answer != question.get("enter_your_answer"):
+            if question.get(
+                "enter_your_answer"
+            ) is not None and existing_question.enter_your_answer != question.get(
+                "enter_your_answer"
+            ):
                 existing_question.enter_your_answer = question.get("enter_your_answer")
 
-            if question.get("is_active") is not None and existing_question.is_active != question.get("is_active"):
+            if question.get(
+                "is_active"
+            ) is not None and existing_question.is_active != question.get("is_active"):
                 existing_question.is_active = question.get("is_active")
-
 
             existing_question.save()
 
@@ -2591,22 +2720,37 @@ class AssignmentQuestionViewSet(BaseViewset, BasePaginator):
                     for existing_option in existing_options:
                         if option.get("id") == existing_option.id:
                             should_update = False
-                            if option.get("name") is not None and existing_option.name != option.get("name"):
+                            if option.get(
+                                "name"
+                            ) is not None and existing_option.name != option.get(
+                                "name"
+                            ):
                                 should_update = True
                                 existing_option.name = option.get("name")
-                            if option.get("is_active") is not None and existing_option.is_active != option.get("is_active"):
+                            if option.get(
+                                "is_active"
+                            ) is not None and existing_option.is_active != option.get(
+                                "is_active"
+                            ):
                                 should_update = True
                                 existing_option.is_active = option.get("is_active")
-                            if option.get("is_correct") is not None and existing_option.is_correct != option.get("is_correct"):
+                            if option.get(
+                                "is_correct"
+                            ) is not None and existing_option.is_correct != option.get(
+                                "is_correct"
+                            ):
                                 should_update = True
                                 existing_option.is_correct = option.get("is_correct")
-                            if option.get("sequence") is not None and existing_option.sequence != option.get("sequence"):
+                            if option.get(
+                                "sequence"
+                            ) is not None and existing_option.sequence != option.get(
+                                "sequence"
+                            ):
                                 should_update = True
                                 existing_option.sequence = option.get("sequence")
                             if should_update:
                                 existing_option.save()
                                 should_update = False
-
 
             for option in options:
                 for existing_option in existing_options:
@@ -2649,20 +2793,24 @@ class AssignmentQuestionViewSet(BaseViewset, BasePaginator):
                 {"success": False, "error": "Something went wrong"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
     def delete(self, request, pk):
         print("enter")
         try:
             question = AssignmentQuestion.objects.get(pk=pk)
-            print("question===>",question)
+            print("question===>", question)
         except AssignmentQuestion.DoesNotExist:
-            return Response({"error": "AssignmentQuestion not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "AssignmentQuestion not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         question_options = question.question_options.all()
-        print("question_options===>",question_options)
+        print("question_options===>", question_options)
         question_options.delete()
 
         question.delete()
         return Response({"success": True}, status=status.HTTP_204_NO_CONTENT)
+
 
 class StudentAssignmentSerializer(BaseSerializer):
 
@@ -2670,13 +2818,14 @@ class StudentAssignmentSerializer(BaseSerializer):
         model = StudentAssignment
         fields = ["id", "name", "description"]
 
+
 class NewStudentAssignmentSerializer(BaseSerializer):
-    subject_name = serializers.ReadOnlyField(source='subject.name')
+    subject_name = serializers.ReadOnlyField(source="subject.name")
 
     class Meta:
         model = StudentAssignment
-        fields = '__all__'
-        read_only_fields = ('subject_name',)
+        fields = "__all__"
+        read_only_fields = ("subject_name",)
 
 
 class StudentAssignmentViewSet(BaseViewset, BasePaginator):
@@ -2718,26 +2867,61 @@ class ReasonForErrorViewSet(BaseViewset):
             )
         return Response(serializer.data)
 
+
 # code use to get custom api link created by suresh
 class Create_custom_Link(BaseViewset):
-    def get_custom_link_data(self,request):
-        data=[{"subject_name":"math","Chapter":"chapter1","Upcoming_Date":date.today(),"meeting_link":"http://zoom.com"},{"subject_name":"math","Chapter":"chapter1","Upcoming_Date":date.today(),"meeting_link":"http://zoom.com"},
-              {"subject_name":"math","Chapter":"chapter1","Upcoming_Date":date.today(),"meeting_link":"http://zoom.com"}]
-        return Response({"result":data})
+    def get_custom_link_data(self, request):
+        data = [
+            {
+                "subject_name": "math",
+                "Chapter": "chapter1",
+                "Upcoming_Date": date.today(),
+                "meeting_link": "http://zoom.com",
+            },
+            {
+                "subject_name": "math",
+                "Chapter": "chapter1",
+                "Upcoming_Date": date.today(),
+                "meeting_link": "http://zoom.com",
+            },
+            {
+                "subject_name": "math",
+                "Chapter": "chapter1",
+                "Upcoming_Date": date.today(),
+                "meeting_link": "http://zoom.com",
+            },
+        ]
+        return Response({"result": data})
+
 
 class HomeAssignment(BaseViewset):
 
-    def get_homeassignment(self,request):
-        data =[{"subject_name":"math","chapter":"chapter2","Upcoming_Date":datetime.now(),"meeting_link":"http://zoom.com"},
-            {"subject_name":"math","chapter":"chapter2","Upcoming_Date":datetime.now(),"meeting_link":"http://zoom.com"},
-            {"subject_name":"math","chapter":"chapter2","Upcoming_Date":datetime.now(),"meeting_link":"http://zoom.com"}
+    def get_homeassignment(self, request):
+        data = [
+            {
+                "subject_name": "math",
+                "chapter": "chapter2",
+                "Upcoming_Date": datetime.now(),
+                "meeting_link": "http://zoom.com",
+            },
+            {
+                "subject_name": "math",
+                "chapter": "chapter2",
+                "Upcoming_Date": datetime.now(),
+                "meeting_link": "http://zoom.com",
+            },
+            {
+                "subject_name": "math",
+                "chapter": "chapter2",
+                "Upcoming_Date": datetime.now(),
+                "meeting_link": "http://zoom.com",
+            },
+        ]
+        return Response({"result": data})
 
-            ]
-        return Response({"result":data})
 
+# getting all module list api created by suresh yadav
 
-
-#getting all module list api created by suresh yadav
 
 class NewModuleSerilializer(BaseSerializer):
     # mega_domain = MegaDomainGetSerializer(read_only=True)
@@ -2746,6 +2930,7 @@ class NewModuleSerilializer(BaseSerializer):
         model = Module
         fields = ["id", "name", "description", "sequence"]
 
+
 class ListModuleViewSet(BaseViewset):
     serializer_class = NewModuleSerilializer
     model = Module
@@ -2753,7 +2938,7 @@ class ListModuleViewSet(BaseViewset):
 
     def list(self, request):
         mega_domain = request.GET.get("name")
-        print("mega_domain is:",mega_domain)
+        print("mega_domain is:", mega_domain)
         if mega_domain:
             serializer = NewModuleSerilializer(
                 Module.objects.filter(name=mega_domain).order_by("-created_at"),
@@ -2800,7 +2985,7 @@ class ListModuleViewSet(BaseViewset):
     def create(self, request):
         try:
             name = request.data.get("name")
-            print("name is:",name)
+            print("name is:", name)
             existing_module = Module.objects.filter(name=name)
             if existing_module:
                 return Response(
@@ -2871,6 +3056,7 @@ class ListModuleViewSet(BaseViewset):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+
 # class SubTopicSerializer(serializers.ModelSerializer):
 #     topic = TopicSerializer(read_only=True)
 #     class Meta:
@@ -2881,35 +3067,42 @@ class ListModuleViewSet(BaseViewset):
 class TopicSerializer(serializers.ModelSerializer):
     # assignments = AssignmentSerializer(many=True)
     subtopics = SubTopicSerializer(many=True, read_only=True)
+
     class Meta:
         model = Topic
         fields = "__all__"
 
+
 class DomainTopicSerilazer(serializers.ModelSerializer):
     topic = TopicSerializer(many=True, read_only=True)
+
     class Meta:
-        model =Domain
+        model = Domain
         fields = "__all__"
+
 
 class MegaDomainTopicSerializer(serializers.ModelSerializer):
     domains = DomainTopicSerilazer(many=True)
 
     class Meta:
         model = MegaDomain
-        fields = '__all__'
+        fields = "__all__"
+
 
 class MoleculeTopicSubtopicSerializer(serializers.ModelSerializer):
     molecule = MoleculeSerializer()
     topic = TopicSerializer(read_only=True)
     subtopics = SubTopicSerializer(read_only=True)
+
     class Meta:
         model = MoleculeTopicSubtopic
         fields = "__all__"
 
+
 class MoleculeSerializers(serializers.ModelSerializer):
     class Meta:
-        model=Molecule
-        fields=[
+        model = Molecule
+        fields = [
             "id",
             "title",
             "is_active",
@@ -2917,13 +3110,15 @@ class MoleculeSerializers(serializers.ModelSerializer):
             "updated_at",
             "domain",
             "mega_domain",
-            "subject"
-    ]
+            "subject",
+        ]
 
 
 class MoleculeGetSerializer(serializers.ModelSerializer):
 
-    molecule_topic_subtopics = MoleculeTopicSubtopicSerializer(many=True, read_only=True)
+    molecule_topic_subtopics = MoleculeTopicSubtopicSerializer(
+        many=True, read_only=True
+    )
     topics = TopicSerializer(many=True, read_only=True)
     subtopics = SubTopicSerializer(many=True, read_only=True)
     subject = SubjectSerializer(read_only=True)
@@ -2932,19 +3127,27 @@ class MoleculeGetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Molecule
-        fields = ['id', 'title','is_active', 'subject', 'mega_domain', 'domain','topics','subtopics','molecule_topic_subtopics']
+        fields = [
+            "id",
+            "title",
+            "is_active",
+            "subject",
+            "mega_domain",
+            "domain",
+            "topics",
+            "subtopics",
+            "molecule_topic_subtopics",
+        ]
+
 
 class GetMotherSessionMoleculeSerializer(BaseSerializer):
     class Meta:
         model = MotherSessionMolecule
-        fields = '__all__'
-
-
-
+        fields = "__all__"
 
 
 class MoleculeViewSet(BaseViewset):
- 
+
     def list(self, request):
 
         try:
@@ -2953,14 +3156,18 @@ class MoleculeViewSet(BaseViewset):
             subject_param = request.GET.get("subject")
             mega_domain_param = request.GET.get("mega_domain")
             name_param = request.GET.get("name")
-            molecule_topic_subtopics= []
+            molecule_topic_subtopics = []
             paginated_results = []
-            total_records= None
+            total_records = None
 
-            if archive_param=='false' or archive_param is None :
-                molecule_topic_subtopics = MoleculeTopicSubtopic.objects.filter(molecule__is_active=True).order_by("id")
-            else :
-                molecule_topic_subtopics = MoleculeTopicSubtopic.objects.filter(molecule__is_active=False).order_by("id")
+            if archive_param == "false" or archive_param is None:
+                molecule_topic_subtopics = MoleculeTopicSubtopic.objects.filter(
+                    molecule__is_active=True
+                ).order_by("id")
+            else:
+                molecule_topic_subtopics = MoleculeTopicSubtopic.objects.filter(
+                    molecule__is_active=False
+                ).order_by("id")
 
             if subject_param:
                 molecule_topic_subtopics = molecule_topic_subtopics.filter(
@@ -2971,7 +3178,7 @@ class MoleculeViewSet(BaseViewset):
                 molecule_topic_subtopics = molecule_topic_subtopics.filter(
                     Q(molecule__mega_domain__name=mega_domain_param)
                 )
-            
+
             if name_param:
                 molecule_topic_subtopics = molecule_topic_subtopics.filter(
                     Q(molecule__title__icontains=name_param)
@@ -2984,32 +3191,41 @@ class MoleculeViewSet(BaseViewset):
 
             for molecule_topic_subtopic in molecule_topic_subtopics:
                 molecule_id = molecule_topic_subtopic.molecule.id
-                subtopic_data = SubTopicSerializer(molecule_topic_subtopic.subtopic).data
+                subtopic_data = SubTopicSerializer(
+                    molecule_topic_subtopic.subtopic
+                ).data
 
-                if 'subtopics' not in unique_molecules[molecule_id]:
-                    unique_molecules[molecule_id]['subtopics'] = []
+                if "subtopics" not in unique_molecules[molecule_id]:
+                    unique_molecules[molecule_id]["subtopics"] = []
 
-                existing_subtopics = {subtopic['id'] for subtopic in unique_molecules[molecule_id]['subtopics']}
+                existing_subtopics = {
+                    subtopic["id"]
+                    for subtopic in unique_molecules[molecule_id]["subtopics"]
+                }
 
-                if subtopic_data['id'] not in existing_subtopics:
-                    unique_molecules[molecule_id]['subtopics'].append(subtopic_data)
+                if subtopic_data["id"] not in existing_subtopics:
+                    unique_molecules[molecule_id]["subtopics"].append(subtopic_data)
 
-                if 'id' not in unique_molecules[molecule_id]:
-                    unique_molecules[molecule_id].update(MoleculeGetSerializer(molecule_topic_subtopic.molecule).data)
+                if "id" not in unique_molecules[molecule_id]:
+                    unique_molecules[molecule_id].update(
+                        MoleculeGetSerializer(molecule_topic_subtopic.molecule).data
+                    )
 
             total_records = len(unique_molecules)
             # results = list(unique_molecules.values())
-            if request.GET.get('page') != None and request.GET.get('page_size'):
-                page = request.GET.get('page', 1)
+            if request.GET.get("page") != None and request.GET.get("page_size"):
+                page = request.GET.get("page", 1)
                 per_page = 10
-                sorted_molecules = sorted(unique_molecules.values(), key=itemgetter('id'))
+                sorted_molecules = sorted(
+                    unique_molecules.values(), key=itemgetter("id")
+                )
                 paginator = Paginator(sorted_molecules, per_page)
-                    # paginator = Paginator(list(unique_molecules.values()), per_page)
+                # paginator = Paginator(list(unique_molecules.values()), per_page)
                 paginated_results = paginator.get_page(page)
                 paginated_results = paginated_results.object_list
             else:
                 paginated_results = list(unique_molecules.values())
-           
+
                 # if archive_param == 'false' or archive_param is None:
                 #     filtered_records = Molecule.objects.filter(is_active=True)
                 # else:
@@ -3023,65 +3239,60 @@ class MoleculeViewSet(BaseViewset):
 
                 # total_records = filtered_records.count()
 
-        
-            return Response({
-                "success": True,
-                "status": "success",
-                "message": "",
-                "total_records": total_records,
-                "results": paginated_results,
-            })
-        
+            return Response(
+                {
+                    "success": True,
+                    "status": "success",
+                    "message": "",
+                    "total_records": total_records,
+                    "results": paginated_results,
+                }
+            )
+
         except Exception as e:
             print("Exception ====> ", e)
             return Response(
                 {"success": False, "error": "Something went wrong"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
-
 
     def get_by_id(self, request, pk):
-         
+
         molecule = Molecule.objects.get(id=pk)
         molecule_serializer = MoleculeGetSerializer(molecule).data
-        
 
         molecule_topic_subtopics = MoleculeTopicSubtopic.objects.filter(molecule_id=pk)
         topics = []
-        topic_dict={}
+        topic_dict = {}
 
         for molecule_topic_subtopic in molecule_topic_subtopics:
-                
-                topic_serializer = TopicSerializer(molecule_topic_subtopic.topic)
-                topic_data = topic_serializer.data
 
-                subtopic_serializer = SubTopicSerializer(molecule_topic_subtopic.subtopic)
-                subtopic_data = subtopic_serializer.data
+            topic_serializer = TopicSerializer(molecule_topic_subtopic.topic)
+            topic_data = topic_serializer.data
 
-            
-                if topic_data['id'] not in topic_dict:
-                    topic_dict[topic_data['id']] = {
-                        'id': topic_data['id'],
-                        'name': topic_data['name'],
-                        'subtopics': [],
-                    }
+            subtopic_serializer = SubTopicSerializer(molecule_topic_subtopic.subtopic)
+            subtopic_data = subtopic_serializer.data
 
-                topic_dict[topic_data['id']]['subtopics'].append(subtopic_data)
+            if topic_data["id"] not in topic_dict:
+                topic_dict[topic_data["id"]] = {
+                    "id": topic_data["id"],
+                    "name": topic_data["name"],
+                    "subtopics": [],
+                }
+
+            topic_dict[topic_data["id"]]["subtopics"].append(subtopic_data)
 
         topics = list(topic_dict.values())
-        molecule_serializer['topics'] = topics
+        molecule_serializer["topics"] = topics
 
-
-
-        return Response({
-            "success": True,
-            "status": "success",
-            "message": "",
-            "results": molecule_serializer,
-        })
-        
-    
+        return Response(
+            {
+                "success": True,
+                "status": "success",
+                "message": "",
+                "results": molecule_serializer,
+            }
+        )
 
     def create(self, request):
         try:
@@ -3098,10 +3309,7 @@ class MoleculeViewSet(BaseViewset):
             subtopics_data = request.data.get("subtopics")
 
             molecule = Molecule.objects.create(
-                title=title,
-                subject=subject,
-                mega_domain=megadomain,
-                domain=domain
+                title=title, subject=subject, mega_domain=megadomain, domain=domain
             )
 
             subtopic_ids = []
@@ -3109,15 +3317,13 @@ class MoleculeViewSet(BaseViewset):
                 subtopic_ids.append(subtopic_data.get("id"))
 
             subtopics = SubTopic.objects.filter(pk__in=subtopic_ids)
-                
+
             topic_ids = []
             for subtopic in subtopics:
                 MoleculeTopicSubtopic.objects.create(
-                    molecule=molecule,
-                    topic=subtopic.topic,
-                    subtopic=subtopic
+                    molecule=molecule, topic=subtopic.topic, subtopic=subtopic
                 )
-                
+
             return Response(
                 {
                     "success": True,
@@ -3144,24 +3350,21 @@ class MoleculeViewSet(BaseViewset):
         try:
             existing_molecule = Molecule.objects.get(pk=pk)
 
-            is_active = request.data.get('is_active')
+            is_active = request.data.get("is_active")
             if is_active is not None:
-                if(is_active == True):
+                if is_active == True:
                     existing_molecule.is_active = False
                 else:
                     existing_molecule.is_active = True
-
 
             title = request.data.get("title")
             if title is not None and existing_molecule.title != title:
                 existing_molecule.title = title
 
-
             subject = request.data.get("subject")
             if subject and subject != existing_molecule.subject:
                 change_subject = Subject.objects.get(pk=subject)
                 existing_molecule.subject = change_subject
-
 
             mega_domain = request.data.get("megadomain")
             if mega_domain and mega_domain != existing_molecule.mega_domain:
@@ -3189,16 +3392,15 @@ class MoleculeViewSet(BaseViewset):
                             molecule_topic_subtopic = MoleculeTopicSubtopic.objects.get(
                                 molecule=existing_molecule,
                                 subtopic__id=subtopic_id,
-                                topic=topic_instance
-                                )
+                                topic=topic_instance,
+                            )
                         except MoleculeTopicSubtopic.DoesNotExist:
                             molecule_topic_subtopic = MoleculeTopicSubtopic(
                                 molecule=existing_molecule,
                                 subtopic=subtopic_instance,
-                                topic=subtopic_instance.topic
+                                topic=subtopic_instance.topic,
                             )
                             molecule_topic_subtopic.save()
-
 
             serializer = MoleculeSerializers(existing_molecule)
 
@@ -3218,20 +3420,26 @@ class MoleculeViewSet(BaseViewset):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-    def delete_subtopic_molecules(self, request, molecule_id,subtopic_id):
-        MoleculeTopicSubtopic.objects.filter(molecule_id=molecule_id, subtopic_id=subtopic_id).delete()
-        return Response({
-            "success":True,
-            "status":"success",
-            "message":"Molecules deleted Successfully",
-        })
+    def delete_subtopic_molecules(self, request, molecule_id, subtopic_id):
+        MoleculeTopicSubtopic.objects.filter(
+            molecule_id=molecule_id, subtopic_id=subtopic_id
+        ).delete()
+        return Response(
+            {
+                "success": True,
+                "status": "success",
+                "message": "Molecules deleted Successfully",
+            }
+        )
+
 
 class MotherSessionMoleculeSerializer(BaseSerializer):
     molecule = MoleculeSerializer()
-  
+
     class Meta:
         model = MotherSessionMolecule
         fields = "__all__"
+
 
 class MotherSessionMoleculeViewSet(BaseViewset):
 
@@ -3246,14 +3454,13 @@ class MotherSessionMoleculeViewSet(BaseViewset):
         subject = Subject.objects.get(pk=subject_id)
         mega_domain = MegaDomain.objects.get(pk=mega_domain_id)
 
-
         session_plan = SessionPlan.objects.create(
             name=session_plan_name,
             description=description,
             is_active=True,
             # sequence = sequence,
-            subject = subject,
-            mega_domain = mega_domain,
+            subject=subject,
+            mega_domain=mega_domain,
         )
 
         session_plan = SessionPlan.objects.get(pk=session_plan.id)
@@ -3262,21 +3469,20 @@ class MotherSessionMoleculeViewSet(BaseViewset):
         for molecule_id in molecule_ids:
             molecule = Molecule.objects.get(pk=molecule_id)
 
-            mother_session_molecule= MotherSessionMolecule.objects.create(
-                molecule=molecule,
-                session_plan=session_plan
-        )
+            mother_session_molecule = MotherSessionMolecule.objects.create(
+                molecule=molecule, session_plan=session_plan
+            )
             serializer = MotherSessionMoleculeSerializer(mother_session_molecule)
             created_records.append(serializer.data)
 
         return Response(
-                {
-                    "success": True,
-                    "status": "success",
-                    "message": "Session created successfully",
-                    "results": [created_records],
-                }
-            )
+            {
+                "success": True,
+                "status": "success",
+                "message": "Session created successfully",
+                "results": [created_records],
+            }
+        )
 
     def list(self, request):
         msls = MotherSessionMolecule.objects.all().order_by("id")
@@ -3287,16 +3493,18 @@ class MotherSessionMoleculeViewSet(BaseViewset):
             session_id = msl.session_plan.id
             molecule_data = MoleculeSerializer(msl.molecule).data
 
-            if 'molecules' not in session_dict[session_id]:
-                session_dict[session_id]['molecules'] = []
+            if "molecules" not in session_dict[session_id]:
+                session_dict[session_id]["molecules"] = []
 
-            existing_molecules = {molecule['id'] for molecule in session_dict[session_id]['molecules']}
+            existing_molecules = {
+                molecule["id"] for molecule in session_dict[session_id]["molecules"]
+            }
 
-            if molecule_data['id'] not in existing_molecules:
+            if molecule_data["id"] not in existing_molecules:
                 domain = msl.molecule.domain
                 domain_data = DomainSerializer(domain).data
 
-                topics = domain.topics.all() 
+                topics = domain.topics.all()
 
                 topic_data_list = []
 
@@ -3306,32 +3514,24 @@ class MotherSessionMoleculeViewSet(BaseViewset):
                     subtopics = topic.subtopics.all()
                     subtopic_data_list = SubTopicSerializer(subtopics, many=True).data
 
-                    topic_data['subtopics'] = subtopic_data_list
+                    topic_data["subtopics"] = subtopic_data_list
                     topic_data_list.append(topic_data)
 
-                molecule_data['topics'] = topic_data_list
-                session_dict[session_id]['molecules'].append(molecule_data)
+                molecule_data["topics"] = topic_data_list
+                session_dict[session_id]["molecules"].append(molecule_data)
 
-            if 'id' not in session_dict[session_id]:
-                session_dict[session_id].update(SessionPlanSerializer(msl.session_plan).data)
+            if "id" not in session_dict[session_id]:
+                session_dict[session_id].update(
+                    SessionPlanSerializer(msl.session_plan).data
+                )
 
         results = list(session_dict.values())
 
-        return Response({
-            "success": True,
-            "status": "success",
-            "message": "",
-            "results": results,
-        })
-    
-    
-
-   
-        
-    
-    
-
-
-
-
-
+        return Response(
+            {
+                "success": True,
+                "status": "success",
+                "message": "",
+                "results": results,
+            }
+        )

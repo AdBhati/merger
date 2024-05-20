@@ -54,6 +54,7 @@ from zuperscore.api.views.assessments import (
     WeeklyProgressViewSet,
     GenerateBulkAssessmentSessionView,
     TestIRTQuestionViewSet,
+    FetchQuestionViewSet,
 )
 
 from zuperscore.api.views.subjects import (
@@ -289,7 +290,7 @@ urlpatterns = [
         RenderAssessmentSessionView.as_view(),
         name="generate-assessment-session",
     ),
-    path("questions-by-ids/", QuestionViewSet.as_view({"post": "questions_by_ids"})),
+    path("questions-by-ids/", FetchQuestionViewSet.as_view({"post": "questions_by_ids"})),
     path(
         "users/assessments-sessions/sections/",
         UserAssessmentSessionSectionQuestionsView.as_view(),

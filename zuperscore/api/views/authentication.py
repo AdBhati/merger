@@ -7,7 +7,7 @@ import re
 from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
-from zuperscore.api.permissions.permissions import IsAdminOrUserManager
+from zuperscore.api.permissions import IsAdminOrUserManager
 from rest_framework.views import APIView
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
