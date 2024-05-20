@@ -564,11 +564,8 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
 
             user_type = request.user.role
             commenter_type = 'tutor' if user_type == 'tutor' else 'user'
-            print("User type:", user_type)
-            # not_covered_messages =[]
-
+           
             if user_type == 'tutor':
-            # Mark molecules as completed based on tutor's input
                 for molecule_id in molecules_data:
                     AppointmentMolecule.objects.update_or_create(
                         appointment=appointment,
@@ -579,16 +576,12 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
 
                 molecules_data_str = list(map(str, molecules_data))
 
-                # Fetch all molecules related to this appointment
                 appointment_molecules = AppointmentMolecule.objects.filter(appointment=appointment)
 
                 for molecule in appointment_molecules:
-                    print("Molecule:", molecule.molecule_id)
 
                     if str(molecule.molecule_id) in molecules_data_str:
-                        # if not molecule.is_completed:
                             molecule.is_completed = True
-                            # molecule.save()
                     else:
                             molecule.is_completed = False
                     molecule.save()
@@ -612,7 +605,9 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 )
             
             appointment.is_completed = True
-            appointment.end_at = timezone.now().strftime("%Y-%m-%d %H:%M:%S")
+            if user_type == 'tutor':
+                western_time = pytz.timezone('Asia/Kolkata')
+                appointment.end_at = western_time.localize(datetime.now())
             appointment.save()
 
             return Response({'message': 'Feedback and molecules updated successfully.'}, status=status.HTTP_200_OK)
@@ -707,12 +702,17 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 appointment=last_completed_appointment, 
                 is_completed=True
             )
+            molecule=last_classes_agenda.values_list('molecule', flat=True)
 
-            home_assignment_status = StudentAssignment.objects.filter(
-                student_id=student_id, 
-                is_completed=True, 
-                type="HOME"
-            ).exists()
+            molecule_topic_subtopic=MoleculeTopicSubtopic.objects.filter(molecule_id__in=molecule)
+
+            home_assignment_status =StudentAssignment.objects.filter(subtopic__in=molecule_topic_subtopic.values_list('subtopic', flat=True),student_id=student_id,type="HOME",is_completed=True).exists()
+
+            # home_assignment_status = StudentAssignment.objects.filter(
+            #     student_id=student_id, 
+            #     is_completed=True, 
+            #     type="HOME"
+            # ).exists()
 
          
             appointment_serializer = NewAppointmentSerializer(last_completed_appointment)
@@ -751,18 +751,19 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
 
         if appointment_status == 'completed':
             # completed_margin = now - timedelta(hours=1, minutes=30)
-            appointments = appointments.filter(Q(is_completed=True) | (Q(start_at__lt=now - timedelta(hours=1, minutes=30)) & Q(is_completed=False))).order_by("-start_at")
+            appointments = appointments.filter(Q(is_completed=True) | (Q(start_at__lt=now - timedelta(hours=1, minutes=30)) & Q(is_completed=False))).exclude(status__in=['CANCELLED', 'RESCHEDULED']).order_by("-start_at")
 
         elif appointment_status == 'upcoming':
             # upcoming_margin = now + timedelta(hours=1, minutes=30)
             # appointments = appointments.filter(Q(is_completed=False) & Q(start_at__gt=now) & Q(start_at__gte=upcoming_margin))
-            appointments = appointments.filter(is_completed=False)
+            appointments = appointments.filter(is_completed=False).exclude(status__in=['CANCELLED', 'RESCHEDULED'])
+
     
         if sort_order == 'asc':
-            appointments = appointments.filter(host_id=host_id).order_by('created_at')
+            appointments = appointments.filter(host_id=host_id).order_by('start_at')
 
         else :
-            appointments = appointments.filter(host_id=host_id).order_by('-created_at')
+            appointments = appointments.filter(host_id=host_id).order_by('-start_at')
 
         appointments = appointments.annotate(student_count=Count('student'))
         appointments = list(appointments)
@@ -824,15 +825,12 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
             if appointment_data['type'] == 'group_class':
                 appointment_data['student_count'] = len(appointment_resource_grouping_map.get(appointment_data['resource_id'], []))
 
-           
-            # print('tp tp tpye :: ', appointment.type)
-            # print('tp tp id :: ', appointment.id)
-            
-            
+
+            appointment_obj=AppointmentReport.objects.filter(appointment=appointment.id).first()
+            appointment_data['is_tutor_joined']=appointment_obj.is_tutor_joined if appointment_obj else False
+
             modified_appointments.append(appointment_data)
-        print("appointment_data=================>",modified_appointments)    
-            
-        
+         
         for app in modified_appointments:
             if app['type'] == 'group_class' and app['id'] in groupedAppointId:
                 app['student'] = appointment_resource_grouping_map[app['resource_id']]
@@ -1149,13 +1147,13 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
         try:
             subject = request.query_params.get('subject', None)
             cpea = request.query_params.get('cpea', None)
+            slug = request.query_params.get('slug')
             print(f"Subject: {subject}")
             student = User.objects.get(pk=pk)
             serializer = UserSerializer(student)
             english_reading_tutors = student.english_reading_tutors.all()
             english_writing_tutors = student.english_writing_tutors.all()
             math_tutors = student.math_tutors.all()
-       
             
             if subject == 'math':
                 tutors = math_tutors
@@ -1174,6 +1172,7 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 if subject in ['math', 'english_reading', 'english_writing']:
                     tutors = tutors.filter(tutor_type=subject)
 
+
             print(f"Subject: {subject}")
             # print(f"Tutors====>: {UserBaseSerializer(tutors,many=True).data}")
 
@@ -1184,15 +1183,14 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
 
             tutor_data=[]
 
-        
             for tutor in tutors:
-                tutor_data_response = self.get_dayScheduler_resource_by_id(request, tutor.day_schedule_user_id)
+                tutor_data_response = self.get_dayScheduler_resource_by_id(request, tutor.day_schedule_user_id, slug)
                 if tutor_data_response.status_code == 200:
                     tutor_data = tutor_data_response.data.get("users_list", [])
                     
                     if cpea:
                         tutor_data = [event for event in tutor_data if 'CPEA' in event['name']]
-
+            
                         anonymized_tutor = [{
                         "id": tutor.id,
                         "first_name": f"Tutor {tutor_name_counter}",
@@ -1241,7 +1239,7 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
             )
         
     #Private Method
-    def admin_all_tutor_list(self, mega_domain, request, id):
+    def admin_all_tutor_list(self, mega_domain, request, id, slug):
         student = User.objects.get(pk=id)
         serializer = UserSerializer(student)
         
@@ -1250,12 +1248,10 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
         english_writing_tutors = student.english_writing_tutors.all()
         math_tutors = student.math_tutors.all()
         
-        # Combine all tutors into one list
         all_student_tutors = list(english_reading_tutors) + list(english_writing_tutors) + list(math_tutors)
         
         subject_tutors = User.objects.filter(tutor_type=mega_domain.lower(), role='tutor', day_schedule_user_id__isnull=False)
         
-        # Find assigned tutor within student tutors
         assigned_tutor = None
         for tutor in all_student_tutors:
             if tutor in subject_tutors:
@@ -1271,17 +1267,23 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
 
         for tutor in subject_tutors:
             print("tutors id is ===========>>>>",tutor.day_schedule_user_id)
-            tutor_data_response = self.get_dayScheduler_resource_by_id(request, tutor.day_schedule_user_id)
+            tutor_data_response = self.get_dayScheduler_resource_by_id(request, tutor.day_schedule_user_id, slug)
             # print("")
             if tutor_data_response.status_code == 200:
                 tutor_data = tutor_data_response.data.get("users_list", [])
+
+                # if slug:
+                #     filtered_events = [event for event in tutor_data if slug in event['name']]
+                #     print("filtered events admin===>",filtered_events)
+                #     tutor_data = filtered_events
+
                 all_responses.append({
                     "tutors_detail": UserMinimumSerializer([tutor], many=True).data,
                     "tutor_id": tutor.day_schedule_user_id,
-                    "users_list": tutor_data[0]
+                    "users_list": tutor_data
                 })
-                
 
+                                
         return Response(
             {
                 "id": student.id,
@@ -1298,11 +1300,15 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
     def get_child(self, request, id):
         mega_domain = request.query_params.get('mega_domain', None)
         cpea = request.query_params.get('cpea', None)
+        slug = request.query_params.get('slug')
         print(f"Subject: {mega_domain}")
+        print(f"Slug: {slug}")
         print(f"cpea: {cpea}")
 
         if request.user.role == "admin":
-            return self.admin_all_tutor_list(mega_domain,request, id)
+            print("enter in")
+            print("Role is",request.user.role)
+            return self.admin_all_tutor_list(mega_domain, request, id,slug)
         
         student = User.objects.get(pk=id)
         # serializer = UserSerializer(student)
@@ -1312,7 +1318,6 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
         # tutor_data= None
 
         if mega_domain == 'math':
-            
             tutors = math_tutors
             print("enter in math")
         elif mega_domain == 'english_reading':
@@ -1335,7 +1340,8 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
         all_responses = []
 
         for tutor in tutors:
-            tutor_data_response = self.get_dayScheduler_resource_by_id(request, tutor.day_schedule_user_id)
+            tutor_data_response = self.get_dayScheduler_resource_by_id(request, tutor.day_schedule_user_id, slug)
+            print('response===>',tutor_data_response)
             if tutor_data_response.status_code == 200:
                 tutor_data = tutor_data_response.data.get("users_list", [])
                 
@@ -1365,36 +1371,38 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
     
     #----------------------------------------------------------------
     # day scheduler api to return all users link based on the Day-scheduler id
-    def get_dayScheduler_resource_by_id(self, request, tutor_id):
-
+    def get_dayScheduler_resource_by_id(self, request, tutor_id, slug):
         if not tutor_id:
-            return Response({"error": "Tutor DayScheduler ID is not provided or is invalid"}, status=400)
+            return Response({"error": "Tutor DayScheduler ID is not provided or is invalid"}, status=status.HTTP_400_BAD_REQUEST)
         
         get_all_users_url = "https://api.dayschedule.com/v1/resources"
-        # print("get_all_users_url==>",get_all_users_url)
+        headers = {"Content-Type": "application/json"}
 
-        headers = {
-            "Content-Type": "application/json",   
-        }
-        params ={
+        params = {
             "user_id": tutor_id,
             "apiKey": "AOthHfwumTELV7qUslLHRNxeOpObRhvp"
         }
 
-        print("user_id====>", params["user_id"])
-        # print("api key =======>",params)
-        try: 
+        try:
             response = requests.get(get_all_users_url, headers=headers, params=params)
+            
             if response.status_code == 200:
-                users_list = response.json().get("result",[])
-                # print("users_list==>",users_list)
+                users_list = response.json().get("result", [])
+                print("users_list===>", users_list)
+
+                if slug:
+                    filtered_events = [event for event in users_list if slug in event['slug']]
+                    print("filtered_events====>", filtered_events)
+                    users_list = filtered_events
+
                 return Response({"users_list": users_list})
-    
-            else :
-                return {"error": response.status_code}
+
+            else:
+                return Response({"error": response.status_code}, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
-            print("Error Occured:", e)
+            print("Error Occurred:", e)
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
      #----------------------------------------------------------------
 
@@ -1486,11 +1494,15 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 # Check for time overlap with a conservative duration estimate.
                 for appointment in same_day_appointments:
                     appointment_start = appointment.start_at
-
                     appointment_end = appointment_start + timedelta(minutes=int(appointment.duration) if appointment.duration else MAX_DURATION_MINUTES)
 
                     if (new_start_datetime < appointment_end and estimated_end_time > appointment_start):
                         return Response({"error": "The new appointment overlaps with an existing one."}, status=status.HTTP_400_BAD_REQUEST)
+                    
+                if appointment_type == 'group_class':
+                    existing_group_classes = Appointments.objects.filter(student=student, type='group_class',start_at__date=appointment_date,mega_domain=mega_domain,)
+                    if existing_group_classes.exists():
+                        return Response({"error": "You can only book one group class of the same mega domain at a time."}, status=status.HTTP_400_BAD_REQUEST)
 
             new_booking = Appointments.objects.create(
                 invitee_name=invitee_name,
@@ -1572,10 +1584,9 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
 #----------------------------------------------------------------
   
     def get_coming_classes(self, request, invitee_id):
-        print("enter==>")
+       
         try:
             bookings = Appointments.objects.filter(invitee_id=invitee_id).select_related('host')
-            print("Bookings===>", bookings)
             serializer = AppointmentSerializer(bookings, many=True)
             data = serializer.data
            
@@ -1598,7 +1609,6 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                     appointment.save()
 
                 taught_molecules = AppointmentMolecule.objects.filter(appointment__id=appointment_id).values_list('molecule_id', flat=True)
-                
                 related_subtopics = MoleculeTopicSubtopic.objects.filter(molecule_id__in=taught_molecules).values_list('subtopic_id', flat=True)
                 
                 
@@ -1622,7 +1632,7 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                     student_id=invitee_id,
                     type="HOME",
                 )
-
+                has_molecules = AppointmentMolecule.objects.filter(appointment__id=appointment.id).exists()
                 home_assignment_present = related_home_assignments.exists() 
                 home_assignment_count = len(related_home_assignments)
                 are_all_home_assignments_completed = len(completed_home_assignments)  == home_assignment_count
@@ -1637,6 +1647,7 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 appointment_data['is_student_filled_feedback'] = student_feedback_exists
                 appointment_data['is_tutor_filled_feedback'] = tutor_feedback_exists
                 appointment_data['home_assignment_present'] = home_assignment_present
+                appointment_data['has_molecules'] = has_molecules
 
             return Response({
                 "bookings": data,
@@ -1649,8 +1660,7 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
         sort_order = self.request.query_params.get('order',None)
         subject_query = request.query_params.get('search', None)
 
-    
-        appointments = Appointments.objects.filter(is_completed=True, student_id=student_id).order_by('created_at')
+        appointments = Appointments.objects.filter(is_completed=True, student_id=student_id).exclude(status__in=['CANCELLED', 'RESCHEDULED']).order_by('created_at')
 
         if subject_query:
             appointments = appointments.filter(
@@ -1668,18 +1678,14 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 student_feedback_exists = FeedBack.objects.filter(
                     Q(student=appointment.student.id),
                     appointment=appointment,
-                    # commenter='user',                
                 ).exists()
 
-                print("student_feedback_exists==>",student_feedback_exists)
                 
                 tutor_feedback_exists = FeedBack.objects.filter(
                     Q(tutor=appointment.host),
                     appointment=appointment,
-                    # commenter='tutor',
                 ).exists()
 
-                print("tutor_feedback_exists==>",tutor_feedback_exists)
                 
                 if student_feedback_exists and tutor_feedback_exists:
 
@@ -1698,8 +1704,6 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                         is_active=True
                     ).exists()
 
-                    print("has_home_assignments====>",has_home_assignments)
-
                     home_assignment_completed = StudentAssignment.objects.filter(
                         subtopic_id__in=related_subtopics,
                         student_id=student_id,
@@ -1708,7 +1712,6 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                         is_completed=True  
                     ).exists()
 
-                    print("home_assignment_completed==============>",home_assignment_completed)
 
                     appointment.home_assignment_present = has_home_assignments  #_Transient_field
                     appointment.home_assignment_completed = home_assignment_completed
@@ -2368,7 +2371,7 @@ class StudentAvailabilityViewSet(BaseViewset):
 
             student = User.objects.get(pk=student_id)
             user = User.objects.get(id=user_id)
-
+            role = 'TUTOR'
             # Perform the Day-Schedule ID check only for tutors
             if user.role == "tutor" and not user.day_schedule_user_id:
                 print("Enter")
@@ -2388,18 +2391,21 @@ class StudentAvailabilityViewSet(BaseViewset):
 
  
             elif user.role == "prep_manager":
+                role = 'PREP MANAGER'
                 student.prep_managers.add(user)
             elif user.role == "sso_manager":
+                role = 'SSO MANAGER'
                 student.sso_managers.add(user)
             elif user.role == "ops_manager":
+                role = 'OPS MANAGER'
                 student.ops_managers.add(user)
 
             student.save()
-
+            message = role + "assigned successfully..!!"
             return Response({
                     "success": True,
                     "status": "success",
-                    "message": "User assigned successfully.",
+                    "message": message,
                 }, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -2463,8 +2469,8 @@ class TutorDashBoradViewSet(BaseViewset):
         upcoming_appointments = Appointments.objects.filter(
             host=logged_in_user_id,
             start_at__gt=current_time,
-            is_completed = False    
-        ).order_by('start_at')
+            is_completed = False 
+        ).exclude(status__in=['CANCELLED', 'RESCHEDULED']).order_by('start_at')
 
         
         total_feedback = FeedBack.objects.filter(
@@ -2564,222 +2570,212 @@ class TeacherAppointmentFeedbackViewSet(BaseViewset):
    
 class StudentDashBoardViewSet(BaseViewset):
 
+    def get_student_availabilities(self, student_id):
+        student_availabilities = StudentAvailability.objects.filter(student=student_id)
+        if not student_availabilities.exists():
+            raise Http404('Student not found')
+        return student_availabilities
+
+    def get_test_tracker(self, student_availabilities):
+        for i in range(1, 5):
+            student_check = student_availabilities.filter(**{f'target_test_date_{i}__isnull': False})
+            if student_check.exists():
+                return i
+        return 0
+
+    def get_course_and_exam_dates(self, student_availabilities, test_tracker):
+        course_end_date = None
+        exam_date = None
+        for student_availability in student_availabilities:
+            if not course_end_date and student_availability.core_prep_date:
+                course_end_date = student_availability.core_prep_date
+            if test_tracker == 1:
+                exam_date = student_availability.target_test_date_1
+            elif test_tracker == 2:
+                exam_date = student_availability.target_test_date_2
+            elif test_tracker == 3:
+                exam_date = student_availability.target_test_date_3
+            elif test_tracker == 4:
+                exam_date = student_availability.target_test_date_4
+        return course_end_date, exam_date
+
+    def calculate_total_days(self, student_availabilities):
+        total_blackout_days = 0
+        total_accelerator_days = 0
+        for student_availability in student_availabilities:
+            start_date = student_availability.start_date
+            end_date = student_availability.end_date
+            total_days = student_availability.total_days
+            if total_days == 0 and start_date and end_date:
+                days = (end_date - start_date).days + 1
+            else:
+                days = total_days
+            if student_availability.type == 'black_out':
+                total_blackout_days += days
+            elif student_availability.type == 'accelerator':
+                total_accelerator_days += days
+        return total_blackout_days, total_accelerator_days
+
+    def get_tutors_assigned(self, user):
+        return {
+            'english_reading': user.english_reading_tutors.exists(),
+            'english_writing': user.english_writing_tutors.exists(),
+            'math': user.math_tutors.exists()
+        }
+
+    def get_session_completion(self, student_session_plans, student_id, tutors_assigned):
+        session_completed = {
+            'english_reading': False,
+            'english_writing': False,
+            'math': False
+        }
+        sessions_assigned = {
+            'english_reading': False,
+            'english_writing': False,
+            'math': False
+        }
+
+        for session_plan in student_session_plans:
+            domain_name = session_plan.mega_domain.name.lower()
+            related_assignments = StudentAssignment.objects.filter(
+                student_id=student_id,
+                megadomain=session_plan.mega_domain,
+                type='HOME',
+                is_completed=False
+            )
+
+            is_completed = getattr(session_plan, 'is_completed', False)
+
+            if domain_name == 'reading' and tutors_assigned['english_reading']:
+                sessions_assigned['english_reading'] = True
+                session_completed['english_reading'] = not related_assignments.exists() or is_completed
+            elif domain_name == 'writing' and tutors_assigned['english_writing']:
+                sessions_assigned['english_writing'] = True
+                session_completed['english_writing'] = not related_assignments.exists() or is_completed
+            elif domain_name == 'math' and tutors_assigned['math']:
+                sessions_assigned['math'] = True
+                session_completed['math'] = not related_assignments.exists() or is_completed
+
+            # If all related assignments are completed or manually marked as completed, mark the session plan as completed
+            if not related_assignments.exists() or is_completed:
+                session_plan.is_completed = True
+                session_plan.save()
+
+        for key in session_completed:
+            if session_completed[key] is None:
+                session_completed[key] = False
+
+        return sessions_assigned, session_completed
+
+    def calculate_total_classes(self, student_session_plans):
+        english_number_of_molecules_list = []
+        math_number_of_molecules_list = []
+
+        for session_plan in student_session_plans:
+            subject_name = session_plan.subject.name.lower()
+            category = session_plan.category.upper()
+            number_of_molecule = MotherSessionMolecule.objects.filter(session_plan=session_plan.id).count()
+            if subject_name == "english":
+                if category == "R":
+                    english_number_of_molecules_list.append(number_of_molecule / 2)
+                elif category == "S":
+                    english_number_of_molecules_list.append(number_of_molecule / 3)
+                elif category == "T":
+                    english_number_of_molecules_list.append(number_of_molecule / 4)
+            elif subject_name == "math":
+                if category == "R":
+                    math_number_of_molecules_list.append(number_of_molecule / 2)
+                elif category == "S":
+                    math_number_of_molecules_list.append(number_of_molecule / 3)
+                elif category == "T":
+                    math_number_of_molecules_list.append(number_of_molecule / 4)
+
+        total_classes = math.ceil(sum(english_number_of_molecules_list)) + math.ceil(sum(math_number_of_molecules_list))
+        return total_classes
+
     def calculate_student_progress(self, request, student_id):
         try:
-            student_availabilities = StudentAvailability.objects.filter(student=student_id)
-            
-            if not student_availabilities.exists():
-                raise Http404('Student not found')
-            
+            student_availabilities = self.get_student_availabilities(student_id)
             student = student_availabilities.first().student
             join_date = student.class_start_date
-            print("join_date===>",join_date)
-            course_end_date = None 
-            exam_date = None
-            test_tracker=0
-            student_check=student_availabilities.filter(target_test_date_1__isnull=False)
-            if not student_check.exists() and test_tracker==0:
-                    test_tracker=1
-                
-            student_check=student_availabilities.filter(target_test_date_2__isnull=False)
-            if not student_check.exists() and test_tracker==0 :
-                    test_tracker=2
-                
-            student_check=student_availabilities.filter(target_test_date_3__isnull=False)
-            if not student_check.exists() and test_tracker==0:
-                    test_tracker=3
-                
-            student_check=student_availabilities.filter(target_test_date_4__isnull=False)
-            if not student_check.exists() and test_tracker==0:
-                    test_tracker=4
-        
-            for student_availability in student_availabilities:
-                if not course_end_date and student_availability.core_prep_date:
-                    course_end_date = student_availability.core_prep_date
-                        
-                if (test_tracker-1)==1:
-                    exam_date = student_availability.target_test_date_1
-                elif (test_tracker-1)==2:
-                    exam_date = student_availability.target_test_date_2
-                elif (test_tracker-1)==3:
-                    exam_date = student_availability.target_test_date_3
-                else :
-                    exam_date = student_availability.target_test_date_4
-                    
+            # student_availabilities[0].student.class_start_date
+            print("join_date",join_date)
+            test_tracker = self.get_test_tracker(student_availabilities)
+            course_end_date, exam_date = self.get_course_and_exam_dates(student_availabilities, test_tracker)
+
             if not course_end_date:
                 return Response({
-                "success": False, 
-                "status": "error", 
-                "message": "Course end date (core_prep_date) is missing for the student."
-            }, status=status.HTTP_400_BAD_REQUEST)
-                
+                    "success": False,
+                    "status": "error",
+                    "message": "Course end date (core_prep_date) is missing for the student."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
             if not exam_date:
                 return Response({
-                "success": False, 
-                "status": "error", 
-                "message": "Exam date (target_test_date_1) is missing for the student."
-            }, status=status.HTTP_400_BAD_REQUEST)
-            total_blackout_days = 0
-            total_accelerator_days = 0
-            user= User.objects.get(id=student_id)
-            print("user======>",user)
-            english_reading_tutors_assigned = user.english_reading_tutors.exists()
-            english_writing_tutors_assigned = user.english_writing_tutors.exists()
-            math_tutors_assigned = user.math_tutors.exists()
-         
-            english_reading_assigned = False
-            english_writing_assigned = False
-            math_assigned =False
-            for student_availability in student_availabilities:
-                start_date = student_availability.start_date
-                end_date = student_availability.end_date
-                total_days=student_availability.total_days
-                
-                if total_days==0 and start_date and end_date:
-                    if student_availability.type == 'black_out':
-                        total_blackout_days += (end_date - start_date).days + 1
-                    elif student_availability.type == 'accelerator':
-                        total_accelerator_days += (end_date - start_date).days + 1
-                else:
-                    if  student_availability.type == 'black_out':
-                        total_blackout_days +=total_days
-                    elif student_availability.type == 'accelerator':
-                         total_accelerator_days += total_days
+                    "success": False,
+                    "status": "error",
+                    "message": "Exam date (target_test_date_1) is missing for the student."
+                }, status=status.HTTP_400_BAD_REQUEST)
 
-            print("total_blackout days======>", total_blackout_days)
-            print("total_accelerator_days=====>",total_accelerator_days)
-
+            total_blackout_days, total_accelerator_days = self.calculate_total_days(student_availabilities)
+            user = User.objects.get(id=student_id)
+            tutors_assigned = self.get_tutors_assigned(user)
             student_session_plans = StudentSessionPlan.objects.filter(student=student_id)
-            print("student session plan", student_session_plans)
 
-            english_reading_session_completed = False
-            english_writing_session_completed = False
-            math_session_completed = False
-            english_reading_assigned = False
-            english_writing_assigned = False
-            math_assigned =False
+            sessions_assigned, session_completed = self.get_session_completion(
+                student_session_plans, student_id, tutors_assigned
+            )
 
-            if student_session_plans.exists():
-                for session_plan in student_session_plans:
-        
-                    if session_plan.mega_domain.name == 'Reading' and english_reading_tutors_assigned:
-                        english_reading_assigned = True
-                        
-                        related_assignments = StudentAssignment.objects.filter(
-                            student_id=student_id,
-                            megadomain=session_plan.mega_domain,
-                            type='HOME',
-                            is_completed=False
-                        )
-                        print("related_assignments R===========>",related_assignments)
+            total_classes = self.calculate_total_classes(student_session_plans)
+            print("total_classes",total_classes)
+            total_course_duration_days = (course_end_date - join_date).days
+            print("total_course_duration_days",total_course_duration_days)
+            elapsed_duration_days = (date.today() - join_date).days
+            print("elapsed_duration_days",elapsed_duration_days)
 
-                        if related_assignments.exists():
-                            english_reading_session_completed = False
+            if elapsed_duration_days > total_course_duration_days:
+                elapsed_duration_days = total_course_duration_days
 
-                        english_reading_session_completed = not related_assignments.exists()
-                    
-                    if session_plan.mega_domain.name == 'Writing' and english_writing_tutors_assigned:  
-                        english_writing_assigned = True
-                        
-                        related_assignments = StudentAssignment.objects.filter(
-                            student_id=student_id,
-                            megadomain=session_plan.mega_domain,
-                            type='HOME',
-                            is_completed=False
-                        )
-                        print("related_assignments W===========>",related_assignments)
+            proportion_of_course_elapsed = elapsed_duration_days / total_course_duration_days if total_course_duration_days > 0 else 0
+            print("Proportion of course elapsed", proportion_of_course_elapsed)
+            expected_classes = max(0, proportion_of_course_elapsed * total_classes)
+            print("expected_classes==>",expected_classes)
+            total_attended_classes = Appointments.objects.filter(
+                student_id=student_id,
+                is_completed=True,
+                is_active=True
+            ).count()
 
-                        english_writing_session_completed = not related_assignments.exists()
-                        if related_assignments.exists():
-                            english_writing_session_completed = False
-                    
-                    if session_plan.mega_domain.name == 'Math' and math_tutors_assigned: 
-                        math_assigned = True
-                        related_assignments = StudentAssignment.objects.filter(
-                            student_id=student_id,
-                            megadomain=session_plan.mega_domain,
-                            type='HOME',
-                            is_completed=False
-                        )
+            results = {
+                'total_classes': total_classes,
+                'expected_classes': math.ceil(expected_classes),
+                'course_end_date': course_end_date,
+                'exam_date': exam_date,
+                'total_attended_classes': total_attended_classes,
+                'english_reading_assigned': sessions_assigned['english_reading'],
+                'english_writing_assigned': sessions_assigned['english_writing'],
+                'math_assigned': sessions_assigned['math'],
+                'math_session_completed': session_completed['math'],
+                'english_writing_session_completed': session_completed['english_writing'],
+                'english_reading_session_completed': session_completed['english_reading'],
+                'total_class_per_day': user.total_class_per_day,
+                'total_mega_domain_class_per_day': user.total_mega_domain_class_per_day
+            }
 
-                        print("related_assignments M===========>",related_assignments)
-                        math_session_completed = not related_assignments.exists()
-                        if related_assignments.exists():
-                            math_session_completed = False
-                
-                
-                # if not student_session_plans.exists():
-                #     return Response('Student has not been assigned any session plan')
-                english_number_of_molecules = 0
-                math_number_of_molecules = 0
+            return Response({
+                "success": True,
+                "status": "success",
+                "message": "Total classes calculated successfully.",
+                "results": results
+            }, status=status.HTTP_200_OK)
 
-                english_number_of_molecules_list = []
-                math_number_of_molecules_list = []
-                for session_plan in student_session_plans:
-                    subject_name = session_plan.subject.name.lower()
-                    number_of_molecule = MotherSessionMolecule.objects.filter(session_plan=session_plan.session_plan.id).count()
-                    category = session_plan.category.upper()
-                    if subject_name == "english":
-                        
-                        if category == "R":
-                            english_number_of_molecules_list.append(number_of_molecule / 2)
-                        elif category == "S":
-                            english_number_of_molecules_list.append(number_of_molecule / 3)
-                        elif category == "T":
-                            english_number_of_molecules_list.append(number_of_molecule / 4)
-                    elif subject_name == "math":
-    
-                        if category == "R":
-                            math_number_of_molecules_list.append(number_of_molecule / 2)
-                        elif category == "S":
-                            math_number_of_molecules_list.append(number_of_molecule / 3)
-                        elif category == "T":
-                           math_number_of_molecules_list.append(number_of_molecule / 4)
-                print(english_number_of_molecules_list,math_number_of_molecules_list)
-                # total_classes = math.ceil(english_number_of_molecules + math_number_of_molecules)
-                total_classes = math.ceil(sum(english_number_of_molecules_list))+math.ceil(sum(math_number_of_molecules_list))
-                total_course_duration_days = (course_end_date - join_date).days
-                elapsed_duration_days = (date.today() - join_date).days
-                if elapsed_duration_days > total_course_duration_days:
-                    elapsed_duration_days = total_course_duration_days
-                proportion_of_course_elapsed = elapsed_duration_days / total_course_duration_days if total_course_duration_days > 0 else 0
-                expected_classes = proportion_of_course_elapsed * total_classes
-                expected_classes = max(0, expected_classes)
-                total_attended_classes = Appointments.objects.filter(
-                    student_id=student_id, 
-                    is_completed=True, 
-                    is_active=True
-                ).count()
-                results = {
-                    'total_classes': total_classes,
-                    'expected_classes':math.ceil(expected_classes),
-                    'course_end_date': course_end_date,
-                    'exam_date': exam_date,
-                    'total_attended_classes':total_attended_classes,
-                    'english_reading_assigned': english_reading_assigned,
-                    'english_writing_assigned':english_writing_assigned,
-                    'math_assigned': math_assigned,
-                    'math_session_completed':math_session_completed,
-                    'english_writing_session_completed':english_writing_session_completed,
-                    'english_reading_session_completed':english_reading_session_completed,
-                    'total_class_per_day': user.total_class_per_day, 
-                    'total_mega_domain_class_per_day': user.total_mega_domain_class_per_day
-                }
-                return Response({
-                    "success": True,
-                    "status": "success",
-                    "message": "Total classes calculated successfully.",
-                    "results": results
-                }, status=status.HTTP_200_OK)
         except Exception as e:
             print("Exception=====>", e)
             return Response(
                 {"success": False, "status": "error", "message": "Something went wrong"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-        
-    
-        
+         
 class NewAssignmentSerializer(BaseSerializer): 
     class Meta:
         model = Assignment
@@ -2874,13 +2870,12 @@ class CpeaBaseViewSet(BaseViewset):
     
     
     def get_student_cpea_report(self, request, student_id):
-            if request.user.role == "user":
-                # student_id = request.user.id
-                # print("student_id===>",student_id)
-                student_cpea_report = StudentCpeaReport.objects.filter(student=student_id)
-            else :
-                appointment_id = request.query_params.get("appointment_id")
+            appointment_id = request.query_params.get("appointment_id")
+            if appointment_id:
                 student_cpea_report = StudentCpeaReport.objects.filter(student=student_id, appointment=appointment_id)
+            else:
+                student_cpea_report = StudentCpeaReport.objects.filter(student=student_id)
+            
             serializers = StudentCpeaReportSerializer(student_cpea_report, many=True)
             return Response({
                 "sucess": True,
@@ -3042,18 +3037,26 @@ class GroupClassesBaseViewSet(BaseViewset):
     def get_student_group_events(self,request):
         logged_in_user_sso = request.user
         # today = date.today()
+        search = request.GET.get('search', None)
+        events_query = StudentGroupEvents.objects.filter(sso=logged_in_user_sso)
+        if search:
+            events_query = events_query.filter(class_name__icontains=search)    
         grouped_events = (
-            StudentGroupEvents.objects
-            .filter(sso=logged_in_user_sso)
+            events_query
             .values('group_id', 'tutor_name', 'class_name', 'subject','is_sso_verified','target_test_date')
             .annotate(
                 total_events=Count('event_id',distinct=True),
                 total_students=Count('student', distinct=True),
-                events_list=Count('id')
+                events_list=Count('id'),
+                max_id=Max('id'),
             )
+            .order_by('-max_id')
         )
+
+        paginator = CustomPageNumberPagination()#add
+        paginated_students = paginator.paginate_queryset(grouped_events, request)#add
         response_data = {'events_list': []}
-        for group_event in grouped_events:
+        for group_event in paginated_students:
             events = (
                 StudentGroupEvents.objects
                 .filter(group_id=group_event['group_id'], sso=logged_in_user_sso)
@@ -3075,13 +3078,14 @@ class GroupClassesBaseViewSet(BaseViewset):
                 'events': list(events)
             }
             response_data['events_list'].append(group_info)
-        
-        return Response({
-                "success": True,
-                "status": "success",
-                "message": "Events List..!",
-                "result":response_data
-            })
+
+        response_data=paginator.get_paginated_response(response_data)#add
+        return Response(
+                # "success": True,
+                # "status": "success",
+                # "message": "Events List..!",
+                response_data.data
+            )
 
 
     def allot_group_classes(self, request):
@@ -3135,15 +3139,12 @@ class GroupClassesBaseViewSet(BaseViewset):
         try:
             student_events = StudentGroupEvents.objects.filter(group_id=group_id).order_by('-created_at')
             student_ids = student_events.values_list('student', flat=True)
-            print("Student===>", student_ids)
             sso_id = student_events.first().sso_id
             group_subject = student_events.first().subject
 
             user_queryset = User.objects.filter(id__in=student_ids)
-            print("user_queryset==>",user_queryset)
 
             student_type = student_events.first().student.isRepeater
-            print("student_type==>",student_type)
 
             if student_type:
                 user_queryset = user_queryset.filter(isRepeater=True)
@@ -3151,7 +3152,6 @@ class GroupClassesBaseViewSet(BaseViewset):
                 user_queryset = user_queryset.filter(isRepeater=False)
 
             subject = student_events.first().subject
-            print("subject==>",subject)
             if subject == 'English':
                 user_queryset = user_queryset.filter(english_category__name__in=['R', 'S', 'T'])
             elif subject == 'Math':
@@ -3173,6 +3173,7 @@ class GroupClassesBaseViewSet(BaseViewset):
             category_counts = {category: 0 for category in ['R', 'S', 'T']}
 
             for user in user_queryset:
+                user_group_event_status=student_events.filter(student=user).first().is_sso_verified
                 categories_matched = []
                 if subject == 'English_Reading' or subject == 'English_Writing' or subject == 'English' and hasattr(user, 'english_category') and user.english_category.name in ['R', 'S', 'T']:
                     categories_matched.append(user.english_category.name)
@@ -3184,6 +3185,7 @@ class GroupClassesBaseViewSet(BaseViewset):
                     user_info = UserMinimumSerializer(user).data
                     user_info['category'] = ', '.join(categories_matched)
                     user_info['subject'] = subject
+                    user_info['is_sso_verified'] = user_group_event_status
                     results.append(user_info)
                     for category in categories_matched:
                         category_counts[category] += 1
@@ -3352,6 +3354,73 @@ class ReportClassesViewSet(BaseViewset):
     #             "status": "success",
     #             "message": "Student Journey Report"
     #         }, status=status.HTTP_201_CREATED)  
+
+class CpeaOverRideViewSet(BaseViewset): #added after merger
+
+    def cpea_override(self, request, student_id, mega_domains):
+        is_completed = request.data.get('is_completed')
+        print("is_completed==>", is_completed)
+        mega_domain_names = mega_domains.split(',')
+        mega_domain_objects = MegaDomain.objects.filter(name__in=mega_domain_names)        
+        student_session_plans = StudentSessionPlan.objects.filter(student_id=student_id, mega_domain__in=mega_domain_objects)
+        student_session_plans.update(is_completed=is_completed)
+        
+        serializer = StudentSessionPlanSerializer(student_session_plans, many=True)
+        
+        return Response({
+            "success": True,
+            "status": "success",
+            "message": "Student session plans updated successfully.",
+            "data": serializer.data
+        }, status=status.HTTP_200_OK)
+    
+
+class UnattendedClassesViewSet(BaseViewset):  #added after merging
+
+    def list(self, request):    
+        appointment_id = request.query_params.get('appointment_id',None)
+        action = request.query_params.get('action', None)
+
+        if request.user.role.lower() == "sso_manager" or 'admin' or 'manager' or 'prep_manager':
+
+            if appointment_id and action in ['cancel', 'reschedule']:
+                try:
+                    appointment = Appointments.objects.get(id=appointment_id)
+                    appointment.status = 'CANCELLED' if action == 'cancel' else 'RESCHEDULED'
+                    appointment.save()
+                    return Response({"sucess":True,"status":"sucess","message":"class canceled or rescheduled sucessfully.."}, status=status.HTTP_201_CREATED)
+                except Appointments.DoesNotExist:
+                    return Response({"error": "Appointment not found"}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            return Response({"error": "You do not have permission to cancel the class"}, status=status.HTTP_403_FORBIDDEN)
+        
+
+        
+    def counters_of_all_classes(self, request):    
+        current_time = datetime.now()
+        completed_classes = Appointments.objects.filter(is_completed=True,type__in=['cpea', 'coreprep', 'group_class']).count()
+        scheduled_classes = Appointments.objects.filter(start_at__gt=current_time, is_completed=False,type__in=['cpea', 'coreprep', 'group_class']).count()
+        student_no_show_classes = AppointmentReport.objects.filter(is_student_joined=False).count()
+        tutor_no_show_classes = AppointmentReport.objects.filter(is_tutor_joined = False).count()
+        total_no_show_classes = student_no_show_classes+tutor_no_show_classes
+        unattended_classes = AppointmentReport.objects.filter(
+            Q(is_student_joined=False) & Q(is_tutor_joined=False),
+        ).count()
+
+        cancelled_class = Appointments.objects.filter(status = 'CANCELED',type__in=['cpea', 'coreprep', 'group_class']).count()
+        reschedule_class = Appointments.objects.filter(status = 'RESCHEDULED',type__in=['cpea', 'coreprep', 'group_class']).count()
+            
+        return Response({
+                "success": True,
+                "status": "success",
+                "message": "Unattended classes reports....",
+                "schedule classes": scheduled_classes,
+                "complete classes": completed_classes,
+                "no show classes": total_no_show_classes,
+                "unattended classes":unattended_classes,
+                "canceled_classes":cancelled_class,
+                "reschedule_classes":reschedule_class
+            }, status=status.HTTP_201_CREATED)
                     
 
 

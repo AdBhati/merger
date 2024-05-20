@@ -37,10 +37,6 @@ from random import randint
 from zuperscore.db.models.conduct import (
     StudentAvailability,
 )
-from zuperscore.api.views.conduct import (
-    StudentAvailabilitySerializer,
-)
-
 
 from zuperscore.utils.msg import send_sms
 PHONE_NUMBER_REGEX_PATTERN = ".*?(\\(?\\d{3}\\D{0,3}\\d{3}\\D{0,3}\\d{4}).*?"
@@ -247,6 +243,8 @@ class SignUpEndpoint(APIView):
             )
 
             serialized_user = UserSerializer(user).data
+
+            serialized_student_availability = StudentAvailabilitySerializer(StudentAvailability.objects.create(student=user)).data
 
             access_token, refresh_token = get_tokens_for_user(user)
             data = {

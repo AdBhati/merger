@@ -97,6 +97,7 @@ from zuperscore.api.views.library import SettingsViewSet,TimeZoneViewSet, TimeAn
 
 from zuperscore.api.views.conduct import (
     CpeaBaseViewSet,
+    CpeaOverRideViewSet,
     GroupClassesBaseViewSet,
     StudentCategoryViewSet,
     AppointmentViewSet,
@@ -109,6 +110,7 @@ from zuperscore.api.views.conduct import (
     TutorDashBoradViewSet,
     # TeacherAppointmentFeedbackViewSet,
     ReportClassesViewSet,
+    UnattendedClassesViewSet,
     
 )
 
@@ -258,10 +260,15 @@ urlpatterns = [
         AllocateManagerViewSet.as_view({"put": "partial_update"}),
     ),
     path(
+        "users/tutors-list",
+        UserViewSet.as_view({"get":"get_subject_tutors"}),
+    ),
+    path(
         "users/<int:pk>/setpassword/",
         UserViewSet.as_view({"post": "set_password"}),
         name="users",
     ),
+    path("users/sso-students", UserViewSet.as_view({"get": "get_sso_students"})),
     path(
         "users/assessments-sessions/",
         UserAssessmentSessionViewSet.as_view({"get": "list", "post": "create"}),
@@ -600,4 +607,8 @@ urlpatterns = [
         "allocate-counselor/<int:pk>/<int:user>/",
         AllocateCounselorViewSet.as_view({"delete": "delete"}),
     ),
+    path("cpea/override/<int:student_id>/<str:mega_domains>", CpeaOverRideViewSet.as_view({"put": "cpea_override"})),  # added after merger
+    path("conduct/unatteneded/classes/", UnattendedClassesViewSet.as_view({"get": "list"})),
+    path("conduct/unatteneded/counters_classes/", UnattendedClassesViewSet.as_view({"get": "counters_of_all_classes"}))
+
 ]

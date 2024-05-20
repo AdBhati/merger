@@ -50,6 +50,7 @@ class StudentSessionPlan(TimeAuditModel):
     )
     corePrep = models.DateField(null=True)
     targetTest = models.DateField(null=True)
+    is_completed = models.BooleanField(default=False)  # added after merging
 
     class Meta:
         """Meta definition for StudentSessionPlan."""
@@ -267,6 +268,10 @@ class StudentQuestionOption(TimeAuditModel):
 
 
 class Appointments(TimeAuditModel):
+    STATUS_CHOICES = [
+        ('CANCELLED', 'Cancelled'),
+        ('RESCHEDULED', 'Rescheduled'),
+    ]
     host = models.ForeignKey(User, on_delete=models.CASCADE, related_name="host", null=False)  # tutor
     subject = models.ForeignKey(
         Subject, on_delete=models.CASCADE, null=True, blank=True, related_name="app_subject"
@@ -279,8 +284,6 @@ class Appointments(TimeAuditModel):
     appointment_time = timezone.now()  
     zoom_link = models.TextField(null=True)  # response
     title = models.CharField(max_length=255, null=True)
-    # start_at = models.CharField(max_length=50, null=True)
-    # end_at = models.CharField(max_length=50, null=True)
     start_at = models.DateTimeField(null=True, blank=True)
     end_at = models.DateTimeField(null=True, blank=True)
     duration = models.CharField(max_length=50, null=True)
@@ -294,11 +297,24 @@ class Appointments(TimeAuditModel):
     ds_host_id = models.CharField(max_length=255, null=True)
     host_name = models.CharField(max_length=255, null=True)
     mega_domain = models.CharField(max_length=255, null=True)
-    
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES,null = True) # added after merging
+    event_duration = models.IntegerField(null=True, blank=True)
 
     class Meta:
         db_table = "appointment"
         # ordering = ("-created")
+
+    #added after merger
+    def save(self, *args, **kwargs):
+        if self.is_completed and self.end_at:  
+            super().save(*args, **kwargs) 
+        elif self.is_completed and not self.end_at:  
+            if self.start_at:  
+                time_difference = timezone.now() - self.start_at
+                self.event_duration = int(time_difference.total_seconds() / 60)  
+            super().save(*args, **kwargs) 
+        else:
+            super().save(*args, **kwargs)  
 
 class Attendee(TimeAuditModel):
     appointment = models.ForeignKey(Appointments, on_delete=models.CASCADE, related_name="appointments")
