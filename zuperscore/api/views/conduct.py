@@ -1590,7 +1590,7 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
     def get_coming_classes(self, request, invitee_id):
        
         try:
-            bookings = Appointments.objects.filter(invitee_id=invitee_id, is_completed=False).exclude(status__in=['CANCELLED', 'RESCHEDULED']).select_related('host')
+            bookings = Appointments.objects.filter(invitee_id=invitee_id, is_completed=True).exclude(status__in=['CANCELLED', 'RESCHEDULED']).select_related('host')
             serializer = AppointmentSerializer(bookings, many=True)
             data = serializer.data
            
@@ -1606,7 +1606,7 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
 
                 appointment_id = appointment_data.get("id")
 
-                appointment = Appointments.objects.filter(id=appointment_id,is_completed=False).exclude(status__in=['CANCELLED', 'RESCHEDULED']).get()
+                appointment = Appointments.objects.filter(id=appointment_id,is_completed=Truej).exclude(status__in=['CANCELLED', 'RESCHEDULED']).get()
                 if zoom_link:
                     appointment.zoom_link = zoom_link
                     appointment.title = subject
