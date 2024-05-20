@@ -608,5 +608,6 @@ urlpatterns = [
     ),
     path("cpea/override/<int:student_id>/<str:mega_domains>", CpeaOverRideViewSet.as_view({"put": "cpea_override"})),  # added after merger
     path("conduct/unatteneded/classes/", UnattendedClassesViewSet.as_view({"get": "list"})),
+    path("conduct/unatteneded/counters_classes/", UnattendedClassesViewSet.as_view({"get": "counters_of_all_classes"}))
 
 ]

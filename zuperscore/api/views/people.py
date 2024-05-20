@@ -356,7 +356,7 @@ class UserMinimumSerializer(serializers.ModelSerializer):
             "is_math_assigned",
             "user_timezone",
             "isRepeater",
-            "day_schedule_user_id",
+            "day_schedule_user_id"
         )
 
 
