@@ -1255,6 +1255,12 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
         all_student_tutors = list(english_reading_tutors) + list(english_writing_tutors) + list(math_tutors)
         
         subject_tutors = User.objects.filter(tutor_type=mega_domain.lower(), role='tutor', day_schedule_user_id__isnull=False)
+
+        cpea = request.query_params.get('cpea', None)
+        print("admin side cpea:",cpea)
+        if cpea:
+            print("enter in if cpea admin side")
+            subject_tutors = subject_tutors.filter(is_cpea_eligible=True)
         
         assigned_tutor = None
         for tutor in all_student_tutors:
@@ -1262,11 +1268,11 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 assigned_tutor = tutor
                 break
         
-        # Move assigned tutor to the top if found
         if assigned_tutor:
             subject_tutors = [assigned_tutor] + [tutor for tutor in subject_tutors if tutor != assigned_tutor]
+
         
-        all_tutors = []
+        
         all_responses = []
 
         for tutor in subject_tutors:
@@ -1276,10 +1282,8 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
             if tutor_data_response.status_code == 200:
                 tutor_data = tutor_data_response.data.get("users_list", [])
 
-                # if slug:
-                #     filtered_events = [event for event in tutor_data if slug in event['name']]
-                #     print("filtered events admin===>",filtered_events)
-                #     tutor_data = filtered_events
+                if cpea:
+                    tutor_data = [event for event in tutor_data if 'CPEA' in event['name']]
 
                 all_responses.append({
                     "tutors_detail": UserMinimumSerializer([tutor], many=True).data,
@@ -3446,8 +3450,8 @@ class UnattendedClassesViewSet(BaseViewset):  #added after merging
             reschedule_class = Appointments.objects.filter(status = 'RESCHEDULED',student_id=student_id,type__in=['cpea', 'coreprep', 'group_class']).exclude(
             appointment_reports__is_student_joined=True).count()
 
-            data = {"schedule_classes": scheduled_classes,
-                    "complete_classes": completed_classes,
+            data = {"scheduled_classes": scheduled_classes,
+                    "completed_classes": completed_classes,
                     "no_show_classes": student_no_show_classes,
                     "canceled_classes":cancelled_class,
                     "reschedule_classes":reschedule_class,
