@@ -1598,7 +1598,7 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
     def get_coming_classes(self, request, invitee_id):
        
         try:
-            bookings = Appointments.objects.filter(invitee_id=invitee_id).exclude(status__in=['CANCELLED', 'RESCHEDULED']).select_related('host')
+            bookings = Appointments.objects.filter(invitee_id=invitee_id).exclude(status__in=['CANCELLED', 'RESCHEDULED']).select_related('host').order_by("start_at")
             serializer = AppointmentSerializer(bookings, many=True)
             data = serializer.data
            
@@ -2686,7 +2686,7 @@ class StudentDashBoardViewSet(BaseViewset):
         for session_plan in student_session_plans:
             subject_name = session_plan.subject.name.lower()
             category = session_plan.category.upper()
-            number_of_molecule = MotherSessionMolecule.objects.filter(session_plan=session_plan.id).count()
+            number_of_molecule = MotherSessionMolecule.objects.filter(session_plan=session_plan.session_plan_id).count()
             if subject_name == "english":
                 if category == "R":
                     english_number_of_molecules_list.append(number_of_molecule / 2)
