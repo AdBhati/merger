@@ -1413,6 +1413,8 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
     # get available Appointment  created by divyanshu by resource_id
     def get_available_appointments(self, request, pk):
         get_available_appointments_url = f"https://api.dayschedule.com/v1/availability/{pk}/"
+        duration = request.query_params.get("duration", "")
+        print("duration===>",duration)
 
         today = datetime.today() - timedelta(days=1)
         end_date = today + timedelta(days=7)
@@ -1425,11 +1427,13 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
             "start": request.query_params.get("start", today.isoformat()),
             "end": request.query_params.get("end", end_date.isoformat()),   
             "time_zone": request.query_params.get("time_zone", "Asia/Calcutta"),  
-            "duration": request.query_params.get("duration", ""),
+            "duration": duration, 
         }
        
         try:
             response = requests.get(get_available_appointments_url, headers=headers, params=params)
+            print("get_available_appointments_url===>",get_available_appointments_url)
+            print("params====>",params)
 
             if response.status_code == 200:
                 availability_data = response.json()
