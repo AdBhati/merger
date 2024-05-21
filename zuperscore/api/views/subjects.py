@@ -85,10 +85,7 @@ class TreeMixin:
 
 
 class CreateSubjectTree(TreeMixin, APIView):
-    permission_classes = (
-        IsPlatformAdmin,
-        IsTypist,
-    )
+    permission_classes = ((IsPlatformAdmin | IsTypist | IsManager),)
 
     def post(self, request):
         title = request.data.get("title")
@@ -100,32 +97,23 @@ class CreateSubjectTree(TreeMixin, APIView):
 
 
 class SubjectTreeByNodeView(TreeMixin, APIView):
-    permission_classes = (
-        IsPlatformAdmin,
-        IsTypist,
-    )
+    permission_classes = ((IsPlatformAdmin | IsTypist | IsManager),)
 
     def get(self, request, node_id):
+        # print(request.user.role)
         root = self.get_node(node_id)
         tree = SubjectNode.dump_bulk(parent=root)
         return Response({"tree": tree}, status=status.HTTP_200_OK)
 
 
 class SubjectNodeViewset(viewsets.ModelViewSet):
-    permission_classes = (
-        IsPlatformAdmin,
-        IsTypist,
-    )
+    permission_classes = ((IsPlatformAdmin | IsTypist | IsManager),)
     serializer_class = SubjectNodeSerializer
     queryset = SubjectNode.objects.all()
 
 
 class AllSubjectRoots(APIView):
-    permission_classes = (
-        ~IsParent,
-        ~IsCounselor,
-        ~IsGuest,
-    )
+    permission_classes = ((~IsParent | ~IsCounselor | ~IsGuest),)
 
     def get(self, request):
         state = request.GET.get("state")
@@ -139,10 +127,7 @@ class AllSubjectRoots(APIView):
 
 
 class SubjectNodeActions(TreeMixin, APIView):
-    permission_classes = (
-        IsPlatformAdmin,
-        IsTypist,
-    )
+    permission_classes = ((IsPlatformAdmin | IsTypist | IsManager),)
 
     def post(self, request):
 
@@ -249,14 +234,16 @@ class SubjectSerializer(BaseSerializer):
 
 class SubjectViewSet(BaseViewset):
     permission_classes = (
-        read_only(IsGuest),
-        read_only(IsStudent),
-        read_only(IsParent),
-        read_only(IsCounselor),
-        read_only(IsUserManager),
-        IsPlatformAdmin,
-        IsTutor,
-        IsManager,
+        (
+            read_only(IsGuest)
+            | read_only(IsStudent)
+            | read_only(IsParent)
+            | read_only(IsCounselor)
+            | read_only(IsUserManager)
+            | IsPlatformAdmin
+            | IsTutor
+            | IsManager
+        ),
     )
     serializer_class = SubjectSerializer
     model = Subject
@@ -315,14 +302,16 @@ class MegaDomainGetSerializer(BaseSerializer):
 
 class MegaDomainViewSet(BaseViewset):
     permission_classes = (
-        ~IsGuest,
-        read_only(IsStudent),
-        read_only(IsParent),
-        read_only(IsCounselor),
-        read_only(IsUserManager),
-        IsPlatformAdmin,
-        IsTutor,
-        IsManager,
+        (
+            ~IsGuest
+            | read_only(IsStudent)
+            | read_only(IsParent)
+            | read_only(IsCounselor)
+            | read_only(IsUserManager)
+            | IsPlatformAdmin
+            | IsTutor
+            | IsManager
+        ),
     )
     serializer_class = MegaDomainSerializer
     model = MegaDomain
@@ -357,7 +346,7 @@ class MegaDomainViewSet(BaseViewset):
 
         if subject_filter:
             megadomain_queryset = megadomain_queryset.filter(
-                subject__name__icontains=subject_filter
+                Q(subject__name__icontains=subject_filter) | Q(subject=subject_filter)
             )
 
         if name_filter:
@@ -652,16 +641,18 @@ class DomainGetSerializer(BaseSerializer):
 
 
 class DomainViewSet(BaseViewset):
-    
+
     permission_classes = (
-        ~IsGuest,
-        read_only(IsStudent),
-        read_only(IsParent),
-        read_only(IsCounselor),
-        read_only(IsUserManager),
-        IsPlatformAdmin,
-        IsTutor,
-        IsManager,
+        (
+            ~IsGuest
+            | read_only(IsStudent)
+            | read_only(IsParent)
+            | read_only(IsCounselor)
+            | read_only(IsUserManager)
+            | IsPlatformAdmin
+            | IsTutor
+            | IsManager
+        ),
     )
 
     serializer_class = DomainSerializer
@@ -833,6 +824,7 @@ class TopicSerializer(BaseSerializer):
 #     class Meta:
 #         model = Domain
 
+
 class TopicGetSerializer(BaseSerializer):
     domain = DomainGetSerializer(read_only=True)
 
@@ -843,14 +835,16 @@ class TopicGetSerializer(BaseSerializer):
 
 class TopicViewSet(BaseViewset):
     permission_classes = (
-        ~IsGuest,
-        read_only(IsStudent),
-        read_only(IsParent),
-        read_only(IsCounselor),
-        read_only(IsUserManager),
-        IsPlatformAdmin,
-        IsTutor,
-        IsManager,
+        (
+            ~IsGuest
+            | read_only(IsStudent)
+            | read_only(IsParent)
+            | read_only(IsCounselor)
+            | read_only(IsUserManager)
+            | IsPlatformAdmin
+            | IsTutor
+            | IsManager
+        ),
     )
     serializer_class = TopicSerializer
     model = Topic
@@ -1036,6 +1030,7 @@ class SubTopicSerializer(BaseSerializer):
         model = SubTopic
         fields = "__all__"
 
+
 class SubTopicGetSerializer(BaseSerializer):
     topic = TopicGetSerializer(read_only=True)
 
@@ -1053,14 +1048,16 @@ class SubTopicGetSerializer(BaseSerializer):
 
 class SubTopicViewSet(BaseViewset):
     permission_classes = (
-        ~IsGuest,
-        read_only(IsStudent),
-        read_only(IsParent),
-        read_only(IsCounselor),
-        read_only(IsUserManager),
-        IsPlatformAdmin,
-        IsTutor,
-        IsManager,
+        (
+            ~IsGuest
+            | read_only(IsStudent)
+            | read_only(IsParent)
+            | read_only(IsCounselor)
+            | read_only(IsUserManager)
+            | IsPlatformAdmin
+            | IsTutor
+            | IsManager
+        ),
     )
     serializer_class = SubTopicSerializer
     model = SubTopic
@@ -1070,8 +1067,12 @@ class SubTopicViewSet(BaseViewset):
             subtopics = SubTopic.objects.all().order_by("id")
             domain_id = request.GET.get("domain_id")
             name = request.GET.get("name")
+            topic = request.GET.get("topic")
             total_records = None
 
+            if topic:
+                subtopics = SubTopic.objects.filter(topic=topic).order_by("-created_at")
+                serializer = SubTopicGetSerializer(subtopics, many=True)
             if domain_id:
                 subtopics = SubTopic.objects.filter(
                     topic__domain__id=domain_id

@@ -15,7 +15,7 @@ from .base import BaseSerializer, BaseViewset
 from zuperscore.api.serializers.people import UserSerializer
 from django.db.models.functions import ExtractMonth, ExtractYear
 from datetime import datetime, timedelta
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from django.db.models.functions import Coalesce
 from django.db.models import Prefetch, Exists, OuterRef
@@ -57,6 +57,7 @@ from rest_framework import serializers
 from rest_framework import viewsets
 from zuperscore.api.permissions import *
 from rest_framework.exceptions import APIException
+from django.http import JsonResponse
 
 
 class SchoolSerializer(BaseSerializer):
@@ -356,7 +357,7 @@ class UserMinimumSerializer(serializers.ModelSerializer):
             "is_math_assigned",
             "user_timezone",
             "isRepeater",
-            "day_schedule_user_id"
+            "day_schedule_user_id",
         )
 
 
@@ -475,7 +476,7 @@ class UserTeachersSerializer(serializers.ModelSerializer):
 
 
 class PeopleView(APIView, BasePaginator):
-    permission_classes = (IsNotStudentOrGuest, ~IsTypist)
+    permission_classes = ((~IsStudent | ~IsTypist | ~IsGuest),)
     filterset_fields = (
         "date_joined",
         "school",
@@ -536,30 +537,30 @@ class PeopleView(APIView, BasePaginator):
     #             status=400,
     #         )
     #     return super().dispatch(request, *args, **kwargs)
-    def dispatch(self, request, *args, **kwargs):
-        # Define roles and their corresponding required query parameters
-        role_params_mapping = {
-            "typist": ["tutor_id"],
-            "manager": ["manager_id"],
-            "parent": ["parent_id"],
-            "counselor": ["counselor"],
-        }
+    # def dispatch(self, request, *args, **kwargs):
+    #     # Define roles and their corresponding required query parameters
+    #     role_params_mapping = {
+    #         "typist": ["tutor_id"],
+    #         "manager": ["manager_id"],
+    #         "parent": ["parent_id"],
+    #         "counselor": ["counselor"],
+    #     }
 
-        # Check if the user belongs to any of the roles in the mapping
-        user_role = request.user.role  # Implement a function to get user's role
-        if user_role in role_params_mapping:
-            required_params = role_params_mapping[user_role]
-            missing_params = [
-                param for param in required_params if param not in request.query_params
-            ]
-            if missing_params:
-                return Response(
-                    {
-                        "error": f"Missing query parameter(s) for role {user_role}: {', '.join(missing_params)}"
-                    },
-                    status=400,
-                )
-        return super().dispatch(request, *args, **kwargs)
+    #     # Check if the user belongs to any of the roles in the mapping
+    #     user_role = request.user.role  # Implement a function to get user's role
+    #     if user_role in role_params_mapping:
+    #         required_params = role_params_mapping[user_role]
+    #         missing_params = [
+    #             param for param in required_params if param not in request.query_params
+    #         ]
+    #         if missing_params:
+    #             return Response(
+    #                 {
+    #                     "error": f"Missing query parameter(s) for role {user_role}: {', '.join(missing_params)}"
+    #                 },
+    #                 status=400,
+    #             )
+    #     return super().dispatch(request, *args, **kwargs)
 
     def get(self, request):
 
@@ -657,7 +658,7 @@ class PeopleView(APIView, BasePaginator):
 
 
 class FilterPeopleViewSet(APIView, BasePaginator):
-    permission_classes = (IsNotStudentOrGuest, ~IsTypist)
+    permission_classes = ((~IsTypist | ~IsStudent | ~IsGuest),)
     search_fields = (
         "^first_name",
         "^last_name",
@@ -715,30 +716,41 @@ class FilterPeopleViewSet(APIView, BasePaginator):
         except Exception as e:
             print("this is error 2", e)
 
-    def dispatch(self, request, *args, **kwargs):
-        # Define roles and their corresponding required query parameters
-        role_params_mapping = {
-            "typist": ["tutor_id"],
-            "manager": ["manager_id"],
-            "parent": ["parent_id"],
-            "counselor": ["counselor"],
-        }
+    # def dispatch(self, request, *args, **kwargs):
+    #     # Define roles and their corresponding required query parameters
+    #     role_params_mapping = {
+    #         "typist": ["tutor_id"],
+    #         "manager": ["manager_id"],
+    #         "parent": ["parent_id"],
+    #         "counselor": ["counselor_id"],
+    #     }
 
-        # Check if the user belongs to any of the roles in the mapping
-        user_role = request.user.role  # Implement a function to get user's role
-        if user_role in role_params_mapping:
-            required_params = role_params_mapping[user_role]
-            missing_params = [
-                param for param in required_params if param not in request.query_params
-            ]
-            if missing_params:
-                return Response(
-                    {
-                        "error": f"Missing query parameter(s) for role {user_role}: {', '.join(missing_params)}"
-                    },
-                    status=400,
-                )
-        return super().dispatch(request, *args, **kwargs)
+    #     # Ensure the user is authenticated and has a role attribute
+    #     user = request.user
+    #     print('this is users', user)
+    #     # if not user.is_authenticated:
+    #     #     return JsonResponse({"error": "User not authenticated"}, status=401)
+
+    #     # Check if the user has a role attribute and get the role
+    #     user_role = getattr(user, 'role', None)
+    #     if user_role is None:
+    #         return JsonResponse({"error": "User role not found"}, status=400)
+
+    #     # Check if the user belongs to any of the roles in the mapping
+    #     if user_role in role_params_mapping:
+    #         required_params = role_params_mapping[user_role]
+    #         missing_params = [
+    #             param for param in required_params if param not in request.query_params
+    #         ]
+    #         if missing_params:
+    #             return Response(
+    #                 {
+    #                     "error": f"Missing query parameter(s) for role {user_role}: {', '.join(missing_params)}"
+    #                 },
+    #                 status=status.HTTP_400_BAD_REQUEST,
+    #             )
+
+    #     return super().dispatch(request, *args, **kwargs)
 
     def post(self, request):
 
@@ -768,7 +780,7 @@ class FilterPeopleViewSet(APIView, BasePaginator):
             order = request.GET.get("order")
 
             if active == "false":
-                if request.user.role == "admin":
+                if request.user and request.user.role == "admin":
                     userObjects = User.objects.filter(is_active=False).order_by(
                         "-date_joined"
                     )
@@ -1274,7 +1286,7 @@ class UserViewSet(viewsets.ModelViewSet):
     def partial_update(self, request, pk):
         try:
             user = User.objects.get(pk=pk)
-            slots = request.data.get("slots", user.tutor_slot) 
+            slots = request.data.get("slots", user.tutor_slot)
             print("slots=====>", slots)
 
             total_weekly_supply = (slots * 60 * 5) / 60
@@ -1296,9 +1308,15 @@ class UserViewSet(viewsets.ModelViewSet):
 
             class_start_date = request.data.get("class_start_date")
             print("class_start_date====>", class_start_date)
-            if class_start_date is not None and target_test_date is not None and class_start_date > target_test_date:
+            if (
+                class_start_date is not None
+                and target_test_date is not None
+                and class_start_date > target_test_date
+            ):
                 return Response(
-                    {"message": "class start date should not be greater than target test date"},
+                    {
+                        "message": "class start date should not be greater than target test date"
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             print("goal_post_data===>", target_test_date)
@@ -1310,7 +1328,9 @@ class UserViewSet(viewsets.ModelViewSet):
                 core_prep_date = target_test_date - timedelta(weeks=8)
                 print("core_prep_date==>", core_prep_date)
 
-                student_availability, created = StudentAvailability.objects.get_or_create(student=user)
+                student_availability, created = (
+                    StudentAvailability.objects.get_or_create(student=user)
+                )
                 print("Student Availability=====>", student_availability)
                 student_availability_obj = student_availability
 
@@ -1319,7 +1339,7 @@ class UserViewSet(viewsets.ModelViewSet):
                     Q(target_test_date_1=target_test_date)
                     | Q(target_test_date_2=target_test_date)
                     | Q(target_test_date_3=target_test_date)
-                    | Q(target_test_date_4=target_test_date)
+                    | Q(target_test_date_4=target_test_date),
                 )
                 if student_check.exists():
                     pass
@@ -1329,7 +1349,7 @@ class UserViewSet(viewsets.ModelViewSet):
                         Q(target_test_date_1__gte=target_test_date)
                         | Q(target_test_date_2__gte=target_test_date)
                         | Q(target_test_date_3__gte=target_test_date)
-                        | Q(target_test_date_4__gte=target_test_date)
+                        | Q(target_test_date_4__gte=target_test_date),
                     )
                     if student_ch.exists():
                         return Response(
@@ -1338,29 +1358,25 @@ class UserViewSet(viewsets.ModelViewSet):
                         )
                     test_tracker = 0
                     student_check = StudentAvailability.objects.filter(
-                        student=user,
-                        target_test_date_1__isnull=False
+                        student=user, target_test_date_1__isnull=False
                     )
                     if not student_check.exists():
                         test_tracker = 1
 
                     student_check = StudentAvailability.objects.filter(
-                        student=user,
-                        target_test_date_2__isnull=False
+                        student=user, target_test_date_2__isnull=False
                     )
                     if not student_check.exists() and test_tracker == 0:
                         test_tracker = 2
 
                     student_check = StudentAvailability.objects.filter(
-                        student=user,
-                        target_test_date_3__isnull=False
+                        student=user, target_test_date_3__isnull=False
                     )
                     if not student_check.exists() and test_tracker == 0:
                         test_tracker = 3
 
                     student_check = StudentAvailability.objects.filter(
-                        student=user,
-                        target_test_date_4__isnull=False
+                        student=user, target_test_date_4__isnull=False
                     )
                     if not student_check.exists() and test_tracker == 0:
                         test_tracker = 4
@@ -1373,16 +1389,24 @@ class UserViewSet(viewsets.ModelViewSet):
 
                     if not created:  # Only update if the record was not created
                         if test_tracker == 1:
-                            student_availability_obj.target_test_date_1 = target_test_date
+                            student_availability_obj.target_test_date_1 = (
+                                target_test_date
+                            )
 
                         elif test_tracker == 2:
-                            student_availability_obj.target_test_date_2 = target_test_date
+                            student_availability_obj.target_test_date_2 = (
+                                target_test_date
+                            )
 
                         elif test_tracker == 3:
-                            student_availability_obj.target_test_date_3 = target_test_date
+                            student_availability_obj.target_test_date_3 = (
+                                target_test_date
+                            )
 
                         else:
-                            student_availability_obj.target_test_date_4 = target_test_date
+                            student_availability_obj.target_test_date_4 = (
+                                target_test_date
+                            )
 
                         student_availability_obj.core_prep_date = core_prep_date
                         student_availability_obj.save()
@@ -1442,7 +1466,6 @@ class UserViewSet(viewsets.ModelViewSet):
                 {"success": False, "error": "Something went wrong"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
 
     def get_sso_students(self, request):
         try:
@@ -1561,7 +1584,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
         if subject == "English_Writing":
             tutors = tutors.filter(tutor_type="english_writing")
-            
+
         elif subject == "English_Reading":
             tutors = tutors.filter(tutor_type="english_reading")
 
@@ -1666,11 +1689,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
 class AllocateManagerViewSet(BaseViewset):
     permission_classes = (
-        IsNotStudentOrGuest,
-        ~IsTypist,
-        ~IsParent,
-        ~IsCounselor,
-        ~IsTutor,
+        (IsNotStudentOrGuest | ~IsTypist | ~IsParent | ~IsCounselor | ~IsTutor),
     )
 
     def partial_update(self, request, pk):
@@ -1716,7 +1735,7 @@ class AllocateManagerViewSet(BaseViewset):
 
 
 class UserCustomFieldViewSet(viewsets.ModelViewSet):
-    permission_classes = (IsNotStudentOrGuest, ~IsTypist)
+    permission_classes = ((IsNotStudentOrGuest | ~IsTypist),)
 
     def list(self, serializer):
         serializer = UserMinimumSerializer(User.objects.all(), many=True)
@@ -1822,7 +1841,7 @@ class TargetTestDateViewSet(BaseViewset):
 
 
 class AllocateCounselorViewSet(BaseViewset):
-    permission_classes = (IsPlatformAdmin,)
+    permission_classes = ((IsPlatformAdmin | IsUserManager),)
 
     def get(self, request, pk):
         try:
