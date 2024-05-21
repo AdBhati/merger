@@ -2408,8 +2408,8 @@ class StudentAvailabilityViewSet(BaseViewset):
             elif user.role == "sso_manager":
                 role = 'SSO MANAGER'
                 student.sso_managers.add(user)
-            elif user.role == "ops_manager":
-                role = 'OPS MANAGER'
+            elif user.role == "manager":
+                role = 'MANAGER'
                 student.ops_managers.add(user)
 
             student.save()
