@@ -3407,8 +3407,8 @@ class UnattendedClassesViewSet(BaseViewset):  #added after merging
 
         if student_id:
             current_time = datetime.now()
-            completed_classes = Appointments.objects.filter(is_completed=True,student_id=student_id,type__in=['cpea', 'coreprep', 'group_class']).count()
-            scheduled_classes = Appointments.objects.filter(start_at__gt=current_time, is_completed=False,student_id=student_id,type__in=['cpea', 'coreprep', 'group_class']).count()
+            completed_classes = Appointments.objects.filter(is_completed=True,student_id=student_id,type__in=['cpea', 'coreprep', 'group_class']).exclude(appointment_reports__is_student_joined=False).count()
+            scheduled_classes = Appointments.objects.filter(start_at__gt=current_time, is_completed=False,student_id=student_id,type__in=['cpea', 'coreprep', 'group_class']).exclude(appointment_reports__is_student_joined=False).count()
             student_no_show_classes = AppointmentReport.objects.filter(is_student_joined=False,appointment__student_id=student_id).count()
             #tutor_no_show_classes = AppointmentReport.objects.filter(is_tutor_joined = False).count()
             # total_no_show_classes = student_no_show_classes+tutor_no_show_classes
