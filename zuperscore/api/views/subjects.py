@@ -1707,16 +1707,9 @@ class NewMegaDomainSerializer(BaseSerializer):
 
 
 class StudentSessionPlanTreeSerializer(BaseSerializer):
-    session_plan = SessionPlanSerializer(read_only=True)
+    session_plan = StudentSessionPlanSerializer(read_only=True)
     subject = SubjectSerializer()
     mega_domain = NewMegaDomainSerializer()
-
-    # student_modules = StudentModuleTreeSerializer(
-    #     many=True, source="student_module.all"
-    # )
-    # student_domains = StudentDomainTreeSerializer(
-    #     many=True, source="student_domain.all"
-    # )
 
     class Meta:
         model = SessionPlan
@@ -1729,8 +1722,26 @@ class StudentSessionPlanTreeSerializer(BaseSerializer):
             "session_plan",
             "subject",
             "mega_domain",
-            # "student_domains",
+            "is_completed",
         ]
+class NewStudentSessionPlanTreeSerializer(BaseSerializer):
+    session_plan = StudentSessionPlanSerializer(read_only=True)
+    subject = SubjectSerializer()
+    mega_domain = NewMegaDomainSerializer()
+
+    class Meta:
+        model = StudentSessionPlan
+        fields ="__all__"
+        # fields = [
+        #     "id",
+        #     "name",
+        #     "description",
+        #     "is_active",
+        #     "session_plan",
+        #     "subject",
+        #     "mega_domain",
+        #     "is_completed",
+        # ]
 
 
 class StudentSessionViewSet(BaseViewset, BasePaginator):
@@ -1766,7 +1777,7 @@ class StudentSessionViewSet(BaseViewset, BasePaginator):
 
     def get_by_student_id(self, request, pk):
         try:
-            serializer = StudentSessionPlanTreeSerializer(
+            serializer = NewStudentSessionPlanTreeSerializer(
                 StudentSessionPlan.objects.filter(Q(student=pk) & Q(is_active=True)),
                 many=True,
             )

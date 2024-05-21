@@ -201,7 +201,7 @@ class AppointmentMinimumSerializer(BaseSerializer):
 
     class Meta:
         model = Appointments
-        fields = ["id","zoom_link","host", "start_at", "end_at", "host_name","student","booking","duration","title","is_completed","type","mega_domain","student_count","resource_id"]
+        fields = ["id","zoom_link","host", "start_at", "end_at", "host_name","student","booking","duration","title","is_completed","type","mega_domain","student_count","resource_id","event_duration"]
 
 
 
@@ -606,8 +606,12 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
             
             appointment.is_completed = True
             if user_type == 'tutor':
+                print("enter in tutor side")
+                print("saving in tutor side")
                 western_time = pytz.timezone('Asia/Kolkata')
                 appointment.end_at = western_time.localize(datetime.now())
+
+
             appointment.save()
 
             return Response({'message': 'Feedback and molecules updated successfully.'}, status=status.HTTP_200_OK)
@@ -1251,6 +1255,12 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
         all_student_tutors = list(english_reading_tutors) + list(english_writing_tutors) + list(math_tutors)
         
         subject_tutors = User.objects.filter(tutor_type=mega_domain.lower(), role='tutor', day_schedule_user_id__isnull=False)
+
+        cpea = request.query_params.get('cpea', None)
+        print("admin side cpea:",cpea)
+        if cpea:
+            print("enter in if cpea admin side")
+            subject_tutors = subject_tutors.filter(is_cpea_eligible=True)
         
         assigned_tutor = None
         for tutor in all_student_tutors:
@@ -1258,11 +1268,11 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 assigned_tutor = tutor
                 break
         
-        # Move assigned tutor to the top if found
         if assigned_tutor:
             subject_tutors = [assigned_tutor] + [tutor for tutor in subject_tutors if tutor != assigned_tutor]
+
         
-        all_tutors = []
+        
         all_responses = []
 
         for tutor in subject_tutors:
@@ -1272,10 +1282,8 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
             if tutor_data_response.status_code == 200:
                 tutor_data = tutor_data_response.data.get("users_list", [])
 
-                # if slug:
-                #     filtered_events = [event for event in tutor_data if slug in event['name']]
-                #     print("filtered events admin===>",filtered_events)
-                #     tutor_data = filtered_events
+                if cpea:
+                    tutor_data = [event for event in tutor_data if 'CPEA' in event['name']]
 
                 all_responses.append({
                     "tutors_detail": UserMinimumSerializer([tutor], many=True).data,
@@ -1306,7 +1314,6 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
         print(f"cpea: {cpea}")
 
         if request.user.role == "admin":
-            print("enter in")
             print("Role is",request.user.role)
             return self.admin_all_tutor_list(mega_domain, request, id,slug)
         
@@ -1346,6 +1353,7 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 tutor_data = tutor_data_response.data.get("users_list", [])
                 
                 if cpea:
+                    print("enter in if cpea")
                     tutor_data = [event for event in tutor_data if 'CPEA' in event['name']]
                 
                 all_responses.append({
@@ -1409,6 +1417,8 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
     # get available Appointment  created by divyanshu by resource_id
     def get_available_appointments(self, request, pk):
         get_available_appointments_url = f"https://api.dayschedule.com/v1/availability/{pk}/"
+        duration = request.query_params.get("duration", "")
+        print("duration===>",duration)
 
         today = datetime.today() - timedelta(days=1)
         end_date = today + timedelta(days=7)
@@ -1421,11 +1431,13 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
             "start": request.query_params.get("start", today.isoformat()),
             "end": request.query_params.get("end", end_date.isoformat()),   
             "time_zone": request.query_params.get("time_zone", "Asia/Calcutta"),  
-            "duration": request.query_params.get("duration", ""),
+            "duration": duration, 
         }
        
         try:
             response = requests.get(get_available_appointments_url, headers=headers, params=params)
+            print("get_available_appointments_url===>",get_available_appointments_url)
+            print("params====>",params)
 
             if response.status_code == 200:
                 availability_data = response.json()
@@ -1586,7 +1598,7 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
     def get_coming_classes(self, request, invitee_id):
        
         try:
-            bookings = Appointments.objects.filter(invitee_id=invitee_id).select_related('host')
+            bookings = Appointments.objects.filter(invitee_id=invitee_id).exclude(status__in=['CANCELLED', 'RESCHEDULED']).select_related('host')
             serializer = AppointmentSerializer(bookings, many=True)
             data = serializer.data
            
@@ -1602,13 +1614,13 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
 
                 appointment_id = appointment_data.get("id")
 
-                appointment = Appointments.objects.get(id=appointment_id)
+                appointment = Appointments.objects.filter(id=appointment_id).exclude(status__in=['CANCELLED', 'RESCHEDULED']).get()
                 if zoom_link:
                     appointment.zoom_link = zoom_link
                     appointment.title = subject
                     appointment.save()
 
-                taught_molecules = AppointmentMolecule.objects.filter(appointment__id=appointment_id).values_list('molecule_id', flat=True)
+                taught_molecules = AppointmentMolecule.objects.filter(appointment__id=appointment_id, is_completed=True).values_list('molecule_id', flat=True)
                 related_subtopics = MoleculeTopicSubtopic.objects.filter(molecule_id__in=taught_molecules).values_list('subtopic_id', flat=True)
                 
                 
@@ -2396,8 +2408,8 @@ class StudentAvailabilityViewSet(BaseViewset):
             elif user.role == "sso_manager":
                 role = 'SSO MANAGER'
                 student.sso_managers.add(user)
-            elif user.role == "ops_manager":
-                role = 'OPS MANAGER'
+            elif user.role == "manager":
+                role = 'MANAGER'
                 student.ops_managers.add(user)
 
             student.save()
@@ -3374,6 +3386,8 @@ class CpeaOverRideViewSet(BaseViewset): #added after merger
             "data": serializer.data
         }, status=status.HTTP_200_OK)
     
+   
+    
 
 class UnattendedClassesViewSet(BaseViewset):  #added after merging
 
@@ -3397,30 +3411,58 @@ class UnattendedClassesViewSet(BaseViewset):  #added after merging
 
         
     def counters_of_all_classes(self, request):    
-        current_time = datetime.now()
-        completed_classes = Appointments.objects.filter(is_completed=True,type__in=['cpea', 'coreprep', 'group_class']).count()
-        scheduled_classes = Appointments.objects.filter(start_at__gt=current_time, is_completed=False,type__in=['cpea', 'coreprep', 'group_class']).count()
-        student_no_show_classes = AppointmentReport.objects.filter(is_student_joined=False).count()
-        tutor_no_show_classes = AppointmentReport.objects.filter(is_tutor_joined = False).count()
-        total_no_show_classes = student_no_show_classes+tutor_no_show_classes
-        unattended_classes = AppointmentReport.objects.filter(
-            Q(is_student_joined=False) & Q(is_tutor_joined=False),
-        ).count()
+        student_id = request.query_params.get('student_id','None')
 
-        cancelled_class = Appointments.objects.filter(status = 'CANCELED',type__in=['cpea', 'coreprep', 'group_class']).count()
-        reschedule_class = Appointments.objects.filter(status = 'RESCHEDULED',type__in=['cpea', 'coreprep', 'group_class']).count()
+        if student_id:
+            current_time = datetime.now()
+            # completed_classes = Appointments.objects.filter(is_completed=True,student_id=student_id,type__in=['cpea', 'coreprep', 'group_class']).exclude(appointment_reports__is_student_joined=False).count()
+            # scheduled_classes = Appointments.objects.filter(start_at__gt=current_time, is_completed=False,student_id=student_id,type__in=['cpea', 'coreprep', 'group_class']).exclude(appointment_reports__is_student_joined=False).count()
+
+            completed_classes = Appointments.objects.filter(
+                                is_completed=True,
+                                student_id=student_id,
+                                type__in=['cpea', 'coreprep', 'group_class']
+                            ).exclude(
+                                Q(appointment_reports__is_student_joined=False) |
+                                Q(status='CANCELLED') |
+                                Q(status='RESCHEDULED')
+                            ).count()
             
-        return Response({
+            scheduled_classes = Appointments.objects.filter(
+                            start_at__gt=current_time,
+                            is_completed=False,
+                            student_id=student_id,
+                            type__in=['cpea', 'coreprep', 'group_class']
+                        ).exclude(
+                            Q(appointment_reports__is_student_joined=False) |
+                            Q(status='CANCELLED') |
+                            Q(status='RESCHEDULED')
+                        ).count()
+
+            student_no_show_classes = AppointmentReport.objects.filter(
+                is_student_joined=False,appointment__student_id=student_id).exclude(
+                                        Q(appointment__status='CANCELLED') |
+                                        Q(appointment__status='RESCHEDULED')).count()
+            
+            cancelled_class = Appointments.objects.filter(status = 'CANCELLED',student_id=student_id,type__in=['cpea', 'coreprep', 'group_class']).exclude(
+            appointment_reports__is_student_joined=False).count()
+
+            reschedule_class = Appointments.objects.filter(status = 'RESCHEDULED',student_id=student_id,type__in=['cpea', 'coreprep', 'group_class']).exclude(
+            appointment_reports__is_student_joined=True).count()
+
+            data = {"scheduled_classes": scheduled_classes,
+                    "completed_classes": completed_classes,
+                    "no_show_classes": student_no_show_classes,
+                    "canceled_classes":cancelled_class,
+                    "reschedule_classes":reschedule_class,
+                    #"unattended classes":unattended_classes,
+                    }       
+            return Response({
                 "success": True,
                 "status": "success",
-                "message": "Unattended classes reports....",
-                "schedule classes": scheduled_classes,
-                "complete classes": completed_classes,
-                "no show classes": total_no_show_classes,
-                "unattended classes":unattended_classes,
-                "canceled_classes":cancelled_class,
-                "reschedule_classes":reschedule_class
-            }, status=status.HTTP_201_CREATED)
+                "message": "Class counters retrieved successfully",
+                "results": data
+            }, status=status.HTTP_200_OK)
                     
 
 
