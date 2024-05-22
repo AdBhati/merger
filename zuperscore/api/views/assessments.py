@@ -6,7 +6,9 @@ from rest_framework import serializers
 from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework import status
-from zuperscore.api.views.subjects import SubjectNodeSerializer
+from zuperscore.api.views.subjects import (
+    SubjectNodeSerializer,
+)
 from zuperscore.db.models import User
 from zuperscore.db.models.assessments import (
     Option,
@@ -62,11 +64,13 @@ from zuperscore.api.views.library import FileAssetSerializer
 
 # from background_task import background
 import os
-from celery import shared_task #need to install
+from celery import shared_task  # need to install
 from io import StringIO
 import boto3
 from django.core.files import File
 from django.core.files.base import ContentFile
+from zuperscore.api.permissions import *
+from rest_framework import permissions
 
 
 class AssessmentSectionSerializer(BaseSerializer):
@@ -114,14 +118,16 @@ class AssessmentMinimumSerializer(BaseSerializer):
 
 class AssessmentSectionMinimumSerializer(BaseSerializer):
     assessment = AssessmentMinimumSerializer(read_only=True)
+
     class Meta:
         model = AssessmentSection
         fields = (
-            'id',
-            'name',
-            'type',
-            'assessment',
+            "id",
+            "name",
+            "type",
+            "assessment",
         )
+
 
 class OptionSerializer(BaseSerializer):
     class Meta:
@@ -178,10 +184,10 @@ class QuestionReviewerSerializer(QuestionSerializer):
     section = serializers.SerializerMethodField()
 
     class Meta(QuestionSerializer.Meta):
-        fields = QuestionSerializer.Meta.fields + ( 'section',)
+        fields = QuestionSerializer.Meta.fields + ("section",)
 
     def get_section(self, obj):
-        section_id = self.context.get('section_id')
+        section_id = self.context.get("section_id")
         if section_id:
             try:
                 section = AssessmentSection.objects.get(id=section_id)
@@ -189,6 +195,8 @@ class QuestionReviewerSerializer(QuestionSerializer):
             except AssessmentSection.DoesNotExist:
                 return None
         return None
+
+
 class SectionQuestionSerializer(BaseSerializer):
     class Meta:
         model = SectionQuestion
@@ -210,6 +218,155 @@ class SectionWithQuestionSerializer(BaseSerializer):
         depth = 2
 
 
+class AssessmentWithSectionsSerializer(BaseSerializer):
+    assessment_sections = AssessmentSectionSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Assessment
+        fields = (
+            "id",
+            "name",
+            "description",
+            "instructions",
+            "cover_url",
+            "link",
+            "data",
+            "kind",
+            "state",
+            "assessment_sections",
+        )
+
+
+class UserAssessmentSessionSerializer(serializers.ModelSerializer):
+    assessment_detail = AssessmentSerializer(read_only=True, source="assessment")
+
+    class Meta:
+        model = UserAssessmentSession
+        fields = (
+            "id",
+            "assessment",
+            "user",
+            "data",
+            "is_submitted",
+            "is_reviewed",
+            "is_started",
+            "started_at",
+            "submitted_at",
+            "reviewed_at",
+            "total_time",
+            "total_marks",
+            "total_questions",
+            "total_correct",
+            "total_incorrect",
+            "total_answered",
+            "total_unanswered",
+            "total_visited",
+            "total_unvisited",
+            "total_unattempted",
+            "section_analysis_data",
+            "total_correct_qids",
+            "total_incorrect_qids",
+            "total_unanswered_qids",
+            "total_visited_qids",
+            "total_unvisited_qids",
+            "total_answered_qids",
+            "is_pscale_success",
+            "pscale_data",
+            "section_question_data",
+            "section_info_data",
+            "section_time_data",
+            "section_marks_data",
+            "generated_by",
+            "is_resume_enabled",
+            "state",
+            "scheduled_at",
+            "assessment_detail",
+            "created_at",
+            "updated_at",
+        )
+
+
+class UserAssessmentSessionMinimumSerializer(BaseSerializer):
+    assessment_detail = AssessmentMinimumSerializer(read_only=True, source="assessment")
+    user_detail = UserMinimumSerializer(read_only=True, source="user")
+
+    class Meta:
+        model = UserAssessmentSession
+        fields = (
+            "id",
+            "user_detail",
+            "is_submitted",
+            "is_reviewed",
+            "is_started",
+            "started_at",
+            "submitted_at",
+            "reviewed_at",
+            "total_questions",
+            "total_correct",
+            "section_analysis_data",
+            "state",
+            "is_resume_enabled",
+            "assessment_detail",
+            "created_at",
+            "updated_at",
+        )
+
+
+class AssessmentTagsSerializer(BaseSerializer):
+    class Meta:
+        model = AssessmentTags
+        fields = "__all__"
+
+
+class UserAttemptSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserAttempt
+        fields = "__all__"
+
+
+class GroupSerializer(BaseSerializer):
+    class Meta:
+        model = Group
+        fields = "__all__"
+
+
+class GroupUserSerializer(BaseSerializer):
+    class Meta:
+        model = GroupUser
+        fields = "__all__"
+
+
+class PracticeSetSerializer(BaseSerializer):
+    class Meta:
+        model = PracticeSet
+        fields = "__all__"
+
+
+class PracticeSetAssessmentSerializer(BaseSerializer):
+    class Meta:
+        model = PracticeSetAssessment
+        fields = "__all__"
+
+
+class TestAllocationLoggerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TestAllocationLogger
+        fields = "__all__"
+
+
+class TestAllocationPracticeSetAssessmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TestAllocationPracticeSetAssessment
+        fields = "__all__"
+
+
+class TestAllocationGroupUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TestAllocationGroupUser
+        fields = "__all__"
+
+
+# Viewsets
 class AssessmentSectionViewSet(BaseViewset):
     serializer_class = AssessmentSectionSerializer
     model = AssessmentSection
@@ -222,6 +379,7 @@ class AssessmentSectionViewSet(BaseViewset):
 
 
 class AssessmentViewSet(BaseViewset, BasePaginator):
+    permission_classes = (IsPlatformAdmin,)
     serializer_class = AssessmentSerializer
     model = Assessment
 
@@ -231,7 +389,7 @@ class AssessmentViewSet(BaseViewset, BasePaginator):
         user = request.GET.get("user")
         subject = request.GET.get("subject", None)
         mega_domain = request.GET.get("mega_domain", None)
-        minimum = True if request.GET.get('is_minimum', False) == 'true' else False
+        minimum = True if request.GET.get("is_minimum", False) == "true" else False
 
         archive = True if archive.lower() == "true" else False
 
@@ -255,7 +413,11 @@ class AssessmentViewSet(BaseViewset, BasePaginator):
             assessments = assessments.filter(mega_domain__id=mega_domain)
 
         count = assessments.count()
-        serializer = AssessmentMinimumSerializer(assessments, many=True) if minimum else AssessmentSerializer(assessments, many=True)
+        serializer = (
+            AssessmentMinimumSerializer(assessments, many=True)
+            if minimum
+            else AssessmentSerializer(assessments, many=True)
+        )
 
         # for assessment in serializer.data:
         #     if UserAssessmentSession.objects.filter(assessment__id=assessment['id'], user__id=user).count() > 0:
@@ -387,12 +549,16 @@ class AssessmentViewSet(BaseViewset, BasePaginator):
 
 
 class QuestionViewSet(BaseViewset):
+    permission_classes = ~IsNotStudentOrGuest
     serializer_class = QuestionSerializer
     model = Question
 
     def list(self, request):
         serializer = QuestionSerializer(Question.objects.all(), many=True)
         return Response(serializer.data)
+
+
+class FetchQuestionViewSet(BaseViewset):
 
     def questions_by_ids(self, request):
         question_ids = request.data.get("question_ids")
@@ -412,6 +578,7 @@ class QuestionViewSet(BaseViewset):
 
 
 class AssessmentSectionQuestionViewSet(BaseViewset):
+
     serializer_class = SectionQuestionSerializer
     model = SectionQuestion
 
@@ -421,6 +588,19 @@ class AssessmentSectionQuestionViewSet(BaseViewset):
 
 
 class OptionViewSet(BaseViewset):
+    permission_classes = (
+        (
+            IsPlatformAdmin
+            | IsTypist
+            | read_only(IsUserManager)
+            | read_only(IsManager)
+            | read_only(IsTutor)
+            | read_only(IsCounselor)
+            | read_only(IsParent)
+            | read_only(IsStudent)
+            | read_only(IsGuest)
+        ),
+    )
     serializer_class = OptionSerializer
     model = Option
 
@@ -430,6 +610,7 @@ class OptionViewSet(BaseViewset):
 
 
 class SectionViewSet(BaseViewset):
+    permission_classes = ((IsPlatformAdmin | IsTypist | IsManager | IsTutor),)
     serializer_class = AssessmentSectionSerializer
     model = AssessmentSection
 
@@ -477,6 +658,7 @@ class SectionViewSet(BaseViewset):
 
 
 class SectionQuestionViewSet(BaseViewset):
+    permission_classes = ((IsPlatformAdmin | IsManager | IsTutor),)
     serializer_class = SectionQuestionSerializer
     model = SectionQuestion
 
@@ -506,6 +688,7 @@ class QuestionNodeBridgeSerializer(BaseSerializer):
 
 
 class QuestionNodeViewset(BaseViewset, BasePaginator):
+    permission_classes = ((IsPlatformAdmin | IsTypist | IsManager),)
     serializer_class = QuestionNodeSerializer
     queryset = QuestionNode.objects.all()
     model = QuestionNode
@@ -556,6 +739,8 @@ class QuestionNodeViewset(BaseViewset, BasePaginator):
 
 
 class GenerateQuestionForSection(APIView):
+    permission_classes = ((IsPlatformAdmin | IsTypist),)
+
     def post(self, request):
         section_id = request.data.get("section_id")
         # number_of_quesions = request.data.get('number_of_quesions')
@@ -580,6 +765,8 @@ class GenerateQuestionForSection(APIView):
 
 
 class ChildNodesEndpoint(APIView):
+    permission_classes = ((IsPlatformAdmin | IsTypist),)
+
     def get(self, request, pk):
         try:
             node = SubjectNode.objects.get(id=pk)
@@ -593,6 +780,8 @@ class ChildNodesEndpoint(APIView):
 
 
 class OneLevelChildNodesEndpoint(APIView):
+    permission_classes = ((IsPlatformAdmin | IsTypist),)
+
     def get(self, request, pk):
         try:
             node = SubjectNode.objects.get(id=pk)
@@ -606,6 +795,8 @@ class OneLevelChildNodesEndpoint(APIView):
 
 
 class SearchQuestionEndpoint(APIView, BasePaginator):
+    permission_classes = (IsPlatformAdmin,)
+
     def post(self, request):
         query = request.data.get("query")
         nodes = request.data.get("nodes")
@@ -627,107 +818,18 @@ class SearchQuestionEndpoint(APIView, BasePaginator):
         )
 
 
-class AssessmentWithSectionsSerializer(BaseSerializer):
-    assessment_sections = AssessmentSectionSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = Assessment
-        fields = (
-            "id",
-            "name",
-            "description",
-            "instructions",
-            "cover_url",
-            "link",
-            "data",
-            "kind",
-            "state",
-            "assessment_sections",
-        )
-
-
-class UserAssessmentSessionSerializer(serializers.ModelSerializer):
-    assessment_detail = AssessmentSerializer(read_only=True, source="assessment")
-
-    class Meta:
-        model = UserAssessmentSession
-        fields = (
-            "id",
-            "assessment",
-            "user",
-            "data",
-            "is_submitted",
-            "is_reviewed",
-            "is_started",
-            "started_at",
-            "submitted_at",
-            "reviewed_at",
-            "total_time",
-            "total_marks",
-            "total_questions",
-            "total_correct",
-            "total_incorrect",
-            "total_answered",
-            "total_unanswered",
-            "total_visited",
-            "total_unvisited",
-            "total_unattempted",
-            "section_analysis_data",
-            "total_correct_qids",
-            "total_incorrect_qids",
-            "total_unanswered_qids",
-            "total_visited_qids",
-            "total_unvisited_qids",
-            "total_answered_qids",
-            "is_pscale_success",
-            "pscale_data",
-            "section_question_data",
-            "section_info_data",
-            "section_time_data",
-            "section_marks_data",
-            "generated_by",
-            "is_resume_enabled",
-            "state",
-            "scheduled_at",
-            "assessment_detail",
-            "created_at",
-            "updated_at",
-        )
-
-
-class UserAssessmentSessionMinimumSerializer(BaseSerializer):
-    assessment_detail = AssessmentMinimumSerializer(read_only=True, source="assessment")
-    user_detail = UserMinimumSerializer(read_only=True, source="user")
-
-    class Meta:
-        model = UserAssessmentSession
-        fields = (
-            "id",
-            "user_detail",
-            "is_submitted",
-            "is_reviewed",
-            "is_started",
-            "started_at",
-            "submitted_at",
-            "reviewed_at",
-            "total_questions",
-            "total_correct",
-            "section_analysis_data",
-            "state",
-            "is_resume_enabled",
-            "assessment_detail",
-            "created_at",
-            "updated_at",
-        )
-
-
-class AssessmentTagsSerializer(BaseSerializer):
-    class Meta:
-        model = AssessmentTags
-        fields = "__all__"
-
-
 class UserAssessmentSessionViewSet(BaseViewset, BasePaginator):
+    permission_classes = (
+        (
+            IsPlatformAdmin
+            | IsManager
+            | IsTutor
+            | read_only(IsStudent)
+            | read_only(IsGuest)
+            | read_only(IsParent)
+            | read_only(IsCounselor)
+        ),
+    )
     serializer_class = UserAssessmentSessionSerializer
     model = UserAssessmentSession
 
@@ -856,6 +958,8 @@ class UserAssessmentSessionViewSet(BaseViewset, BasePaginator):
 
 
 class DownloadUserAssessment(BaseViewset):
+    permission_classes = ((~IsUserManager | ~IsGuest | ~IsTypist),)
+
     def get_section_analysis_data(self, section_analysis, index):
         try:
             return (
@@ -1042,6 +1146,8 @@ class DownloadUserAssessment(BaseViewset):
 
 
 class GenerateAssessmentSessionView(APIView):
+    permission_classes = ((IsPlatformAdmin | IsTutor | IsManager | IsUserManager),)
+
     def post(self, request):
         user_id = request.data.get("user")
         assessment_id = request.data.get("assessment")
@@ -1124,6 +1230,8 @@ class GenerateAssessmentSessionView(APIView):
 
 
 class GenerateBulkAssessmentSessionView(APIView):
+    permission_classes = IsPlatformAdmin | IsTutor | IsManager | IsUserManager
+
     def post(self, request, pk):
         if request.user.is_active and request.user.role not in [
             "parent",
@@ -1207,6 +1315,8 @@ class GenerateBulkAssessmentSessionView(APIView):
 
 
 class RenderAssessmentSessionView(APIView):
+    permission_classes = ((~IsCounselor | ~IsParent | ~IsTypist),)
+
     def post(self, request):
         user_assessment_session_id = request.data.get("uas_id")
         assessment_section_id = str(request.data.get("section_id"))
@@ -1280,6 +1390,8 @@ class RenderAssessmentSessionView(APIView):
 
 
 class UserAssessmentSessionSectionQuestionsView(APIView):
+    permission_classes = ((~IsTypist | ~IsParent | ~IsCounselor),)
+
     def post(self, request):
         uas_id = request.data.get("uas_id")
         section_id = str(request.data.get("section_id"))
@@ -1311,6 +1423,8 @@ class UserAssessmentSessionSectionQuestionsView(APIView):
 
 
 class UserAllocatedAssessmentsEndpoint(APIView, BasePaginator):
+    permission_classes = ((IsNotStudentOrGuest | ~IsParent | ~IsGuest),)
+
     def get(self, request, pk):
         kind = request.GET.get("kind", "MOCK")
         assessment_id = request.GET.get("assessment_id", False)
@@ -1351,6 +1465,8 @@ class UserAllocatedAssessmentsEndpoint(APIView, BasePaginator):
 
 
 class UserAllocatedAssessmentsDashboardEndpoint(APIView):
+    permission_classes = ((IsPlatformAdmin | ~IsNotStudentOrGuest),)
+
     def get(self, request):
         now = timezone.now()
         assessment_id = request.GET.get("assessment_id", False)
@@ -1370,6 +1486,8 @@ class UserAllocatedAssessmentsDashboardEndpoint(APIView):
 
 
 class UserAllocatedAssessmentCheckEndpoint(APIView):
+    permission_classes = ((~IsTypist | ~IsParent | ~IsCounselor | ~IsGuest),)
+
     def get(self, request):
         assessment_id = request.GET.get("assessment_id", False)
         nowm5 = timezone.now() - timedelta(minutes=5)  # 855
@@ -1393,6 +1511,8 @@ class UserAllocatedAssessmentCheckEndpoint(APIView):
 
 
 class UserAllocatedAssessmentMistakesEndpoint(APIView):
+    permission_class = ((~IsTypist | ~IsGuest),)
+
     def get(self, request):
         all_sessions = UserAssessmentSession.objects.filter(
             user=request.user
@@ -1404,6 +1524,8 @@ class UserAllocatedAssessmentMistakesEndpoint(APIView):
 
 
 class UserAssessmentSessionByDateEndpoint(APIView):
+    permission_classes = (IsPlatformAdmin,)
+
     def get(self, request):
         date = request.GET.get("date", False)
         today = timezone.now()
@@ -1430,6 +1552,7 @@ class UserAssessmentSessionByDateEndpoint(APIView):
 
 
 class UserAssessmentsEndpoint(APIView, BasePaginator):
+    permmission_classes = ((IsStudent | IsGuest | IsManager | IsTutor),)
 
     search_fields = ("assessment__name",)
 
@@ -1618,6 +1741,8 @@ def item_response_function(theta_array, irt_a, irt_b, irt_c, scored_response_vec
 
 
 class ComputeScaledScoreEndpoint(APIView):
+    permission_classes = ((IsNotStudentOrGuest | ~IsParent | ~IsCounselor | ~IsTypist),)
+
     def post(self, request):
         assessment = Assessment.objects.get(pk=request.data.get("assessment_id"))
         english_sigma = assessment.english_sigma if assessment.english_sigma else 1
@@ -1719,13 +1844,15 @@ class ComputeScaledScoreEndpoint(APIView):
         )
 
 
-class UserAttemptSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = UserAttempt
-        fields = "__all__"
-
-
 class UserAssessmentAttemptEndpoint(BaseViewset):
+    permission_classes = (
+        (
+            ~IsTypist
+            | read_only(IsParent)
+            | read_only(IsCounselor)
+            | read_only(IsUserManager)
+        ),
+    )
     serializer_class = UserAttemptSerializer
 
     def list(self, request, pk):
@@ -1747,6 +1874,12 @@ class UserAssessmentAttemptEndpoint(BaseViewset):
 
 
 class UserAssessmentAttemptViewSet(BaseViewset):
+    permission_classes = (
+        ~IsTypist
+        | read_only(IsParent)
+        | read_only(IsCounselor)
+        | read_only(IsUserManager),
+    )
     serializer_class = UserAttemptSerializer
     model = UserAttempt
 
@@ -1756,7 +1889,7 @@ class UserAssessmentAttemptViewSet(BaseViewset):
 
 
 class AllAssessmentSessionEndpoint(APIView):
-    permission_classes = (AllowAny,)
+    permission_classes = (IsPlatformAdmin,)
 
     def get(self, request):
         assessment_id = request.GET.get("assessment_id")
@@ -1770,7 +1903,7 @@ class AllAssessmentSessionEndpoint(APIView):
 
 
 class CreateUserAttemptBulk(APIView):
-    permission_classes = (AllowAny,)
+    # permission_classes = (AllowAny,)
 
     def post(self, request):
         assessment_id = request.data.get("assessment_id")
@@ -1820,6 +1953,7 @@ def flatten_list(lst):
 
 
 class MistakeAnalyserEndpoint(BasePaginator, APIView):
+    permission_class = ((~IsTypist | ~IsGuest),)
     # def add_attempts(self, results, request):
     #     question_ids = []
     #     for result in results:
@@ -1841,18 +1975,22 @@ class MistakeAnalyserEndpoint(BasePaginator, APIView):
     def find_section_id(self, data, qid):
         for entry in data:
             for item in entry:
-                if qid in item['qid']:
-                    return item['section_id']
+                if qid in item["qid"]:
+                    return item["section_id"]
         return None
 
-    def SerializerQuestion (self, questions, data):
+    def SerializerQuestion(self, questions, data):
         data_list = []
         for quest in questions:
 
-            data_list.append(QuestionReviewerSerializer(quest, context={'section_id' : self.find_section_id(data, quest.id)}).data)
-        
+            data_list.append(
+                QuestionReviewerSerializer(
+                    quest, context={"section_id": self.find_section_id(data, quest.id)}
+                ).data
+            )
+
         return data_list
-    
+
     def post(self, request):
         user = request.data.get("user")
         strategy = request.data.get("strategy")
@@ -1863,33 +2001,25 @@ class MistakeAnalyserEndpoint(BasePaginator, APIView):
         if strategy == "all":
             sessions = (
                 UserAssessmentSession.objects.filter(assessment__kind="MOCK", user=user)
-                .filter(
-                     Q(state="ANALYSED") | Q(state="COMPLETED")
-                )
+                .filter(Q(state="ANALYSED") | Q(state="COMPLETED"))
                 .order_by("-created_at")
             )
         elif strategy == "last_five":
             sessions = (
                 UserAssessmentSession.objects.filter(assessment__kind="MOCK", user=user)
-                .filter(
-                     Q(state="ANALYSED") | Q(state="COMPLETED")
-                )
+                .filter(Q(state="ANALYSED") | Q(state="COMPLETED"))
                 .order_by("-created_at")[:5]
             )
         elif strategy == "last_two":
             sessions = (
                 UserAssessmentSession.objects.filter(assessment__kind="MOCK", user=user)
-                .filter(
-                     Q(state="ANALYSED") | Q(state="COMPLETED")
-                )
+                .filter(Q(state="ANALYSED") | Q(state="COMPLETED"))
                 .order_by("-created_at")[:2]
             )
         elif strategy == "last_eight":
             sessions = (
                 UserAssessmentSession.objects.filter(assessment__kind="MOCK", user=user)
-                .filter(
-                     Q(state="ANALYSED") | Q(state="COMPLETED")
-                )
+                .filter(Q(state="ANALYSED") | Q(state="COMPLETED"))
                 .order_by("-created_at")[:8]
             )
         else:
@@ -1898,9 +2028,7 @@ class MistakeAnalyserEndpoint(BasePaginator, APIView):
                 UserAssessmentSession.objects.filter(
                     assessment_id=assessment_id, user=user
                 )
-                .filter(
-                     Q(state="ANALYSED") | Q(state="COMPLETED")
-                )
+                .filter(Q(state="ANALYSED") | Q(state="COMPLETED"))
                 .order_by("-created_at")
             )
 
@@ -1935,7 +2063,7 @@ class MistakeAnalyserEndpoint(BasePaginator, APIView):
             total_sessions = list(total_incorrect_qids_list) + list(
                 total_unanswered_qids_list
             )
-        
+
         for session in total_sessions:
             if isinstance(session, list) and len(session) > 0:
                 session_qids = [d["qid"] for d in session]
@@ -1972,7 +2100,9 @@ class MistakeAnalyserEndpoint(BasePaginator, APIView):
         return self.paginate(
             request=request,
             queryset=questions,
-            on_results=lambda questions: self.SerializerQuestion(questions, total_sessions),
+            on_results=lambda questions: self.SerializerQuestion(
+                questions, total_sessions
+            ),
             extra_stats={
                 "attempts": UserAttemptSerializer(attempts, many=True).data,
                 "total_questions": questions.count(),
@@ -1982,7 +2112,7 @@ class MistakeAnalyserEndpoint(BasePaginator, APIView):
 
 
 class CreateUserAttemptBulkAsync(APIView):
-    permission_classes = (AllowAny,)
+    permission_classes = (IsPlatformAdmin,)
 
     def post(self, request):
         assessment_id = request.data.get("assessment_id")
@@ -1992,6 +2122,8 @@ class CreateUserAttemptBulkAsync(APIView):
 
 
 class AssessmentSessionCSCDownloadEndpoint(APIView):
+    permission_classes = (IsPlatformAdmin,)
+
     def get(self, request):
         assessment_id = request.GET.get("assessment_id")
         sessions = (
@@ -2027,6 +2159,8 @@ def flatten_list_with_object(lst):
 
 
 class StudentMyPerformanceAnalyticsEndpoint(APIView):
+    permission_classes = ((~IsTypist | ~IsGuest),)
+
     def post(self, request):
         user = request.data.get("user")
         strategy = request.data.get("strategy")
@@ -3209,6 +3343,8 @@ def download_assessment_csv(assessment_id):
 
 
 class UserSessionResultCSVEndpoint(BasePaginator, APIView):
+    permission_classes = ((IsPlatformAdmin | IsTutor | IsManager),)
+
     # Using this decorator to disable csrf.
     @method_decorator(csrf_exempt)
     def dispatch(self, *args, **kwargs):
@@ -3232,13 +3368,8 @@ class UserSessionResultCSVEndpoint(BasePaginator, APIView):
 
 
 # group
-class GroupSerializer(BaseSerializer):
-    class Meta:
-        model = Group
-        fields = "__all__"
-
-
 class GroupViewSet(BaseViewset):
+    permission_classes = ((IsPlatformAdmin | IsManager | IsTutor | IsUserManager),)
     serializer_class = GroupSerializer
     model = Group
 
@@ -3322,13 +3453,8 @@ class GroupViewSet(BaseViewset):
 
 
 # group_user
-class GroupUserSerializer(BaseSerializer):
-    class Meta:
-        model = GroupUser
-        fields = "__all__"
-
-
 class GroupUserViewSet(BaseViewset):
+    permission_classes = ((IsPlatformAdmin | IsManager | IsTutor | IsUserManager),)
     serializer_class = GroupUserSerializer
     model = GroupUser
 
@@ -3366,13 +3492,8 @@ class GroupUserViewSet(BaseViewset):
 
 
 # practice_set
-class PracticeSetSerializer(BaseSerializer):
-    class Meta:
-        model = PracticeSet
-        fields = "__all__"
-
-
 class PracticeSetViewSet(BaseViewset):
+    permission_classes = ((IsPlatformAdmin | IsManager | IsTutor | IsUserManager),)
     serializer_class = PracticeSetSerializer
     model = PracticeSet
 
@@ -3460,13 +3581,10 @@ class PracticeSetViewSet(BaseViewset):
 
 
 # practice_set_assessment
-class PracticeSetAssessmentSerializer(BaseSerializer):
-    class Meta:
-        model = PracticeSetAssessment
-        fields = "__all__"
 
 
 class PracticeSetAssessmentViewSet(BaseViewset):
+    permission_classes = ((IsPlatformAdmin | IsManager | IsTutor | IsUserManager),)
     serializer_class = PracticeSetAssessmentSerializer
     model = PracticeSetAssessment
 
@@ -3509,40 +3627,26 @@ class PracticeSetAssessmentViewSet(BaseViewset):
 
 
 class AssessmentTagsViewSet(viewsets.ModelViewSet):
+    permission_classes = ((IsPlatformAdmin | IsManager | IsTutor | IsTypist),)
     serializer_class = AssessmentTagsSerializer
     queryset = AssessmentTags.objects.all()
 
 
 # test allocation
-class TestAllocationLoggerSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = TestAllocationLogger
-        fields = "__all__"
-
-
-class TestAllocationPracticeSetAssessmentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = TestAllocationPracticeSetAssessment
-        fields = "__all__"
-
-
-class TestAllocationGroupUserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = TestAllocationGroupUser
-        fields = "__all__"
-
-
 class TestAllocationPracticeSetAssessmentViewSet(viewsets.ModelViewSet):
+    permission_classes = ((IsPlatformAdmin | IsManager | IsTutor | IsUserManager),)
     serializer_class = TestAllocationPracticeSetAssessmentSerializer
     queryset = TestAllocationPracticeSetAssessment.objects.all()
 
 
 class TestAllocationGroupUserViewSet(viewsets.ModelViewSet):
+    permission_classes = ((IsPlatformAdmin | IsManager | IsTutor | IsUserManager),)
     serializer_class = TestAllocationGroupUserSerializer
     queryset = TestAllocationGroupUser.objects.all()
 
 
 class TestAllocationLoggerViewSet(viewsets.ModelViewSet):
+    permission_classes = ((IsPlatformAdmin | IsManager | IsTutor | IsUserManager),)
     serializer_class = TestAllocationLoggerSerializer
     queryset = TestAllocationLogger.objects.all()
 
@@ -4048,6 +4152,7 @@ class TestAllocationLoggerViewSet(viewsets.ModelViewSet):
 
 
 class DownloadAssessmentAnalysis(BaseViewset):
+    permission_classes = ((IsPlatformAdmin | IsManager | IsTutor | IsUserManager),)
 
     def download_assessment_analysis(self, request):
         session_id = request.GET.get("session_id")
@@ -4336,6 +4441,8 @@ class WeeklyProgressViewSet(BaseViewset):
 
 
 class TestIRTQuestionViewSet(BaseViewset):
+    permission_classes = ((IsPlatformAdmin | IsTypist),)
+
     def get(self, request, pk):
         try:
             if request.user.role not in ["admin", "typist"]:

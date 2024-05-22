@@ -63,12 +63,12 @@ MIDDLEWARE = [
 ]
 
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": ("rest_framework_simplejwt.authentication.JWTAuthentication",),
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",),
     "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
-    # "DEFAULT_PAGINATION_CLASS": 'rest_framework.pagination.PageNumberPagination',
-    # "PAGE_SIZE": 10
 }
 
 SPECTACULAR_SETTINGS = {"TITLE": "ZuperScore-Dev"}
@@ -95,8 +95,6 @@ TEMPLATES = [
         },
     },
 ]
-
-
 
 
 WSGI_APPLICATION = "zuperscore.wsgi.application"
@@ -217,18 +215,18 @@ AWS_REGION = "ap-south-1"
 
 # The AWS access key to use.
 
-AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY')
+AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY")
 
 # The AWS secret access key to use.
 
-AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_KEY')
+AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_KEY")
 
 # The optional AWS session token to use.
 AWS_SESSION_TOKEN = ""
 
 # The name of the bucket to store files in.
 # AWS_S3_BUCKET_NAME = "library-asset"
-AWS_S3_BUCKET_NAME = 'library-asset'
+AWS_S3_BUCKET_NAME = "library-asset"
 
 # How to construct S3 URLs ("auto", "path", "virtual").
 AWS_S3_ADDRESSING_STYLE = "auto"

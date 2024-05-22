@@ -13,12 +13,10 @@ from zuperscore.db.models.library import FileAsset, TutorAvailability
 from zuperscore.db.models.library import Settings
 from .base import BaseSerializer, BaseViewset
 import boto3
+from zuperscore.api.permissions import *
 from requests.exceptions import HTTPError
 
 class FileAssetSerializer(serializers.ModelSerializer):
-
-    
-
     class Meta:
         model = FileAsset
         fields = ["id", "asset", "attributes", "context", "created_at", "updated_at"]
@@ -57,6 +55,7 @@ class SettingsSerializer(BaseSerializer):
         fields = ["disabled_mistake_analyzer"]
 
 class SettingsViewSet(BaseViewset):
+    permission_classes = (~IsTypist, )
     serializer_class = SettingsSerializer
     model = Settings
 
@@ -67,6 +66,7 @@ class SettingsViewSet(BaseViewset):
         return Response(serializer.data)
     
 class TimeZoneViewSet(BaseViewset):
+    permission_classes = (IsPlatformAdmin,)
 
     def convert_time_zone(self, request):
         from_time_zone = request.data.get('fromTimeZone')
