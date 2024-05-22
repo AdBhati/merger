@@ -114,7 +114,6 @@ from zuperscore.api.views.conduct import (
     AppointmentViewSet,
     StudentAvailabilityViewSet,
     StudentDashBoardViewSet,
-    StudentGroupEvent,
     StudentGroupEventBaseViewSet,
     StudentRelatedTeacherViewSet,
     # StudentJourneyViewSet,
