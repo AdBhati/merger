@@ -352,7 +352,6 @@ class StudentAvailability(TimeAuditModel):
     class Meta:
         db_table = "student_availability"
         
-
 class AppointmentMolecule(TimeAuditModel):
     molecule = models.ForeignKey(Molecule, on_delete=models.CASCADE,null=True, related_name="molecule")
     appointment = models.ForeignKey(Appointments, on_delete=models.CASCADE, null=True, related_name="appointment") 
@@ -414,6 +413,21 @@ class StudentCpeaReport(TimeAuditModel):
 
     class Meta:
         db_table ='student_cpea_reports'
+    
+
+class StudentReadingCpeaReport(TimeAuditModel):
+    type = models.CharField(max_length=80, default='Reading')
+    student = models.ForeignKey(User, on_delete=models.CASCADE, default=None, null=True)
+    mega_domain = models.ForeignKey(MegaDomain, on_delete=models.CASCADE, default=None, null=True)
+    meta_key= models.CharField(max_length=255)
+    meta_value_reponse = models.CharField(max_length=255)
+    meta_value_domain = models.CharField(max_length=255)
+    meta_value_subtopic = models.CharField(max_length=255)
+    meta_value_score = models.IntegerField(default=0)
+    meta_value_skil_tested = models.CharField(max_length=255)
+    
+    class Meta:
+        db_table = 'student_reading_cpea'
 
 
 class StudentTeam(TimeAuditModel):
@@ -465,11 +479,14 @@ class AppointmentReport(TimeAuditModel):
     REASON_CHOICE = [('TUTOR_NOT_JOINED','Tutor_not_joined'),
                    ('STUDENT_NOT_JOINED','Student_not_joined'),
                    ('CANCEL','Cancel'),
-                   ('RESCHEDULE','Reshedule'),]
+                   ('RESCHEDULE','Reshedule'),
+                   ('BOTH_TUTOR_AND_STUDENT_NOT_JOIN','Both_tutor_and_student_not_join'),
+                   ('BOTH_TUTOR_AND_STUDENT_JOIN','Both_tutor_and_student_join'),]
     is_student_joined = models.BooleanField(default=False)
     is_tutor_joined = models.BooleanField(default=False)
     appointment = models.ForeignKey(Appointments, on_delete=models.CASCADE, related_name='appointment_reports')
     reason = models.CharField(max_length=100, choices=REASON_CHOICE)
+    status = models.CharField(max_length=100,null = True)
 
     class Meta:
         db_table = 'appointment_reports'

@@ -61,6 +61,7 @@ from zuperscore.db.models.conduct import (
     StudentGroupEvents,
     # StudentJourney,
     StudentQuestionOption,
+    StudentReadingCpeaReport,
     StudentSessionPlan,
     StudentModule,
     StudentDomain,
@@ -815,6 +816,8 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
            
             booking_ids = [item.get("booking") for item in data]
             day_scheduler_responses = []
+            expired_appointments = []
+
             for booking_id in booking_ids:
                 day_scheduler_response = self.get_dayScheduler_booking(request, booking_id)
                 day_scheduler_responses.append(day_scheduler_response.data)
@@ -830,6 +833,35 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                     appointment.zoom_link = zoom_link
                     appointment.title = subject
                     appointment.save()
+                
+                duration_minutes = int(appointment.duration)  
+                class_end_time = appointment.start_at + timedelta(minutes=duration_minutes)
+                current_time = datetime.now(timezone.utc)
+
+                if current_time > class_end_time:
+                    
+                    appointment_report = AppointmentReport.objects.filter(appointment_id=appointment_id).first()
+                    if appointment_report:
+                        is_student_joined = appointment_report.is_student_joined
+                        is_tutor_joined = appointment_report.is_tutor_joined
+
+                        if not is_student_joined and not is_tutor_joined:
+                            status = 'unattended'
+                            reason = 'BOTH_TUTOR_AND_STUDENT_NOT_JOIN'
+                        elif is_student_joined and not is_tutor_joined:
+                            status = None
+                            reason = 'TUTOR_NOT_JOINED'
+                        elif not is_student_joined and is_tutor_joined:
+                            status = None
+                            reason = 'STUDENT_NOT_JOINED'
+                        else:
+                            status = 'attended'
+                            reason = 'BOTH_TUTOR_AND_STUDENT_JOIN'
+
+                        appointment_report.status = status
+                        appointment_report.reason = reason
+                        appointment_report.save()
+                        expired_appointments.append(appointment_data)
 
                 taught_molecules = AppointmentMolecule.objects.filter(appointment__id=appointment_id, is_completed=True).values_list('molecule_id', flat=True)
                 related_subtopics = MoleculeTopicSubtopic.objects.filter(molecule_id__in=taught_molecules).values_list('subtopic_id', flat=True)
@@ -871,6 +903,9 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 appointment_data['is_tutor_filled_feedback'] = tutor_feedback_exists
                 appointment_data['home_assignment_present'] = home_assignment_present
                 appointment_data['has_molecules'] = has_molecules
+
+            for expired_appointment in expired_appointments:
+                data.remove(expired_appointment)
 
             return Response({
                 "bookings": data,
@@ -2782,6 +2817,8 @@ class CpeaBaseViewSet(BaseViewset):
                 "results": serializers.data,
             })
     
+    
+    
 
     def update_student_cpea_report(self, request, student_id, appointment_id):
         cpea_report = StudentCpeaReport.objects.get(student=student_id, appointment=appointment_id)
@@ -2807,6 +2844,58 @@ class CpeaBaseViewSet(BaseViewset):
                 "message":"CPEA Questions",
                 "results": serializer.data,
             })
+    
+class StudentReadingCpeaReportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StudentReadingCpeaReport
+        fields = '__all__'
+    
+class ReadingCpeaBaseViewSet(BaseViewset):
+    
+    def create_reading_cpea_report(self, request):
+        try:
+            type = request.data.get('type')
+            student_id = request.data.get('student_id')
+            mega_domain = request.data.get('mega_domain')
+            reports = request.data.get('reports')
+
+            for report_data in reports:
+                report_data['type'] = type
+                report_data['student'] = student_id
+                report_data['mega_domain'] = mega_domain
+
+                serializer = StudentReadingCpeaReportSerializer(data=report_data)
+                if serializer.is_valid():
+                    serializer.save()
+                else:
+                    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                
+            return Response({
+            "success": True,
+            "status": "success",
+            "message": "CPEA Reading created Successfully",
+            "results": serializer.data,
+            })
+        except Exception as e:
+            return Response(str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+    def get_by_id(self, request, student_id):
+        try:
+            reports = StudentReadingCpeaReport.objects.filter(student_id=student_id)
+            serializer = StudentReadingCpeaReportSerializer(reports, many=True)
+            return Response({
+            "success": True,
+            "status": "success",
+            "message": "CPEA Reading Report",
+            "results": serializer.data,
+            })
+        except StudentReadingCpeaReport.DoesNotExist:
+            return Response({"error": "Student reports not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response(str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+     
+
     
     
 class GroupClassSerializer(serializers.ModelSerializer):
@@ -2964,7 +3053,6 @@ class StudentGroupEventBaseViewSet(BaseViewset):
             )
             
             group_info = {
-                
                 'group_id': group_event['group_id'],
                 'total_events': group_event['total_events'],
                 'total_students': group_event['total_students'],
@@ -3285,6 +3373,7 @@ class UnattendedClassesViewSet(BaseViewset):  #added after merging
                 try:
                     appointment = Appointments.objects.get(id=appointment_id)
                     appointment.status = 'CANCELLED' if action == 'cancel' else 'RESCHEDULED'
+                    appointment.is_active = False
                     appointment.save()
                     return Response({"sucess":True,"status":"sucess","message":"class canceled or rescheduled sucessfully.."}, status=status.HTTP_201_CREATED)
                 except Appointments.DoesNotExist:
@@ -3292,7 +3381,7 @@ class UnattendedClassesViewSet(BaseViewset):  #added after merging
         else:
             return Response({"error": "You do not have permission to cancel the class"}, status=status.HTTP_403_FORBIDDEN)
         
-
+class UnattendedCounterClassesViewSet(BaseViewset):
         
     def counters_of_all_classes(self, request):    
         student_id = request.query_params.get('student_id','None')

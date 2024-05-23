@@ -110,6 +110,7 @@ from zuperscore.api.views.conduct import (
     GroupClassesBaseViewSet,
     LastClassAgendaViewSet,
     LastClassViewSet,
+    ReadingCpeaBaseViewSet,
     SsoStudentBaseViewSet,
     StudentCategoryViewSet,
     AppointmentViewSet,
@@ -126,6 +127,7 @@ from zuperscore.api.views.conduct import (
     # TeacherAppointmentFeedbackViewSet,
     ReportClassesViewSet,
     UnattendedClassesViewSet,
+    UnattendedCounterClassesViewSet,
     UsersTeamViewSet,
     
 )
@@ -595,13 +597,16 @@ urlpatterns = [
     path('conduct/cpea-assignment-report/<int:student_id>/<int:tutor_id>/', CpeaBaseViewSet.as_view({"post":"post_cpea_assignment_report"})),
     path('conduct/student-cpea-report/<int:student_id>/',CpeaBaseViewSet.as_view({"get":"get_student_cpea_report"})),
     path('conduct/student-cpea-report/<int:student_id>/<int:appointment_id>',CpeaBaseViewSet.as_view({"put":"update_student_cpea_report"})),
+    path('conduct/reading-student-cpea-report/',ReadingCpeaBaseViewSet.as_view({"post":"create_reading_cpea_report"})),
+    path('conduct/reading-student-cpea-report/<int:student_id>',ReadingCpeaBaseViewSet.as_view({"get":"get_by_id"})),
+
 
 
     path('conduct/student-cpea-questions/<str:mega_domain_name>',CpeaBaseViewSet.as_view({"get":"get_cpea_questions"})),
     path("conduct/appointments/day-scheduler-group-events/<int:student_id>", GroupClassesBaseViewSet.as_view({"get":"get_dayScheduler_group_events"})),
     path("conduct/appointments/group-class-events/<int:deptHead_id>/", AssignGroupClassesBaseViewSet.as_view({"post":"assign_group_classes"})),
-    path("conduct/appointments/allot-group-class/", StudentGroupEventBaseViewSet.as_view({"post":"allot_group_classes"})),
-    path("conduct/group-events/", AllotGroupClassBaseViewSet.as_view({"get":"get_student_group_events"})),
+    path("conduct/appointments/allot-group-class/", AllotGroupClassBaseViewSet.as_view({"post":"allot_group_classes"})),
+    path("conduct/group-events/", StudentGroupEventBaseViewSet.as_view({"get":"get_student_group_events"})),
     path("conduct/student-class-stats/<int:student_id>", CheckStudentGroupBaseViewSet.as_view({"get":"check_student_group_assignment"})),
     path("conduct/list-grouped-students/<uuid:group_id>", SsoStudentBaseViewSet.as_view({"get":"get_sso_students_by_group_id"})),
     path("conduct/appointment-report/<int:appointment_id>", ReportClassesViewSet.as_view({"post":"create"})),
@@ -626,6 +631,6 @@ urlpatterns = [
     ),
     path("cpea/override/<int:student_id>/<str:mega_domains>", CpeaOverRideViewSet.as_view({"put": "cpea_override"})),  # added after merger
     path("conduct/unatteneded/classes/", UnattendedClassesViewSet.as_view({"get": "list"})),
-    path("conduct/unatteneded/counters_classes/", UnattendedClassesViewSet.as_view({"get": "counters_of_all_classes"}))
+    path("conduct/unatteneded/counters_classes/", UnattendedCounterClassesViewSet.as_view({"get": "counters_of_all_classes"}))
 
 ]
