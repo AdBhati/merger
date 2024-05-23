@@ -30,6 +30,21 @@ class IsManager(BasePermission):
         )
 
 
+class IsOpsMananger(BasePermission):
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.role == "manager")
+
+
+class IsSsoManager(BasePermission):
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.role == "sso_manager")
+
+
+class IsPrepMananger(BasePermission):
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.role == "prep_manager")
+
+
 class IsTutor(BasePermission):
     def has_permission(self, request, view):
         return bool(request.user and request.user.role == "tutor")

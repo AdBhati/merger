@@ -476,7 +476,16 @@ class UserTeachersSerializer(serializers.ModelSerializer):
 
 
 class PeopleView(APIView, BasePaginator):
-    permission_classes = ((~IsStudent | ~IsTypist | ~IsGuest),)
+    permission_classes = (
+        (
+            IsPlatformAdmin
+            | IsUserManager
+            | IsTutor
+            | IsCounselor
+            | IsParent
+            | IsManager
+        ),
+    )
     filterset_fields = (
         "date_joined",
         "school",
@@ -658,7 +667,17 @@ class PeopleView(APIView, BasePaginator):
 
 
 class FilterPeopleViewSet(APIView, BasePaginator):
-    permission_classes = ((~IsTypist | ~IsStudent | ~IsGuest),)
+    permission_classes = (
+        (
+            IsPlatformAdmin
+            | IsUserManager
+            | IsTutor
+            | IsCounselor
+            | IsParent
+            | IsManager
+        ),
+    )
+
     search_fields = (
         "^first_name",
         "^last_name",
@@ -1169,7 +1188,74 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def retrieve(self, request, pk):
         try:
-            user = NewUserSerializer(User.objects.get(pk=pk)).data
+            if request.user.role in ["admin", "user_manager"]:
+                user = NewUserSerializer(User.objects.get(pk=pk)).data
+            elif request.user.role in ["manager", "sso_manager", "prep_manager"]:
+                try:
+                    user = User.objects.filter(
+                        Q(sso_managers__in=[request.user.id])
+                        | Q(ops_managers__in=[request.user.id])
+                        | Q(prep_managers__in=[request.user.id])
+                    ).get(pk=pk)
+                    user = NewUserSerializer(user).data
+                except Exception as e:
+                    return Response(
+                        {
+                            "success": False,
+                            "status": "error",
+                            "message": "You don't have permission to perform this action",
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+            elif request.user.role in ["tutor"]:
+                try:
+                    user = User.objects.filter(
+                        Q(english_reading_tutors__in=[request.user.id])
+                        | Q(english_tutors__in=[request.user.id])
+                        | Q(english_writing_tutors__in=[request.user.id])
+                        | Q(math_tutors__in=[request.user.id])
+                    ).get(pk=pk)
+                    user = NewUserSerializer(user).data
+                except Exception as e:
+                    return Response(
+                        {
+                            "success": False,
+                            "status": "error",
+                            "message": "You don't have permission to perform this action",
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+            elif request.user.role == "parent":
+                try:
+                    user = User.objects.filter(parents__in=[request.user.id]).get(pk=pk)
+                    user = NewUserSerializer(user).data
+                except Exception as e:
+                    return Response(
+                        {
+                            "success": False,
+                            "status": "error",
+                            "message": "You don't have permission to perform this action",
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+            elif request.user.role == "counselor":
+                try:
+                    user = User.objects.filter(counselors__in=[request.user.id]).get(
+                        pk=pk
+                    )
+                    user = NewUserSerializer(user).data
+                except Exception as e:
+                    return Response(
+                        {
+                            "success": False,
+                            "status": "error",
+                            "message": "You don't have permission to perform this action",
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+            else:
+                user = NewUserSerializer(User.objects.get(pk=request.user.id)).data
+
             ops_managers = [
                 {
                     "id": user.id,
@@ -1329,11 +1415,17 @@ class UserViewSet(viewsets.ModelViewSet):
                 print("core_prep_date==>", core_prep_date)
 
                 # student_availability, created = StudentAvailability.objects.get_or_create(student=user)
-                
-                student_availability=StudentAvailability.objects.filter(student=user).order_by('created_at').first()
-                created=None
+
+                student_availability = (
+                    StudentAvailability.objects.filter(student=user)
+                    .order_by("created_at")
+                    .first()
+                )
+                created = None
                 if not student_availability:
-                    created=StudentAvailability.objects.create(student=user, target_test_date_1=target_test_date)
+                    created = StudentAvailability.objects.create(
+                        student=user, target_test_date_1=target_test_date
+                    )
                 student_availability_obj = student_availability
 
                 student_check = StudentAvailability.objects.filter(
@@ -1690,9 +1782,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
 
 class AllocateManagerViewSet(BaseViewset):
-    permission_classes = (
-        (IsNotStudentOrGuest | ~IsTypist | ~IsParent | ~IsCounselor | ~IsTutor),
-    )
+    permission_classes = ((IsPlatformAdmin | IsManager | IsUserManager),)
 
     def partial_update(self, request, pk):
         try:
@@ -1737,7 +1827,9 @@ class AllocateManagerViewSet(BaseViewset):
 
 
 class UserCustomFieldViewSet(viewsets.ModelViewSet):
-    permission_classes = ((IsNotStudentOrGuest | ~IsTypist),)
+    permission_classes = (
+        (IsPlatformAdmin | IsUserManager | IsParent | IsCounselor | IsManager),
+    )
 
     def list(self, serializer):
         serializer = UserMinimumSerializer(User.objects.all(), many=True)
@@ -1827,6 +1919,11 @@ class TargetTestDateSerializer(serializers.ModelSerializer):
 
 
 class TargetTestDateViewSet(BaseViewset):
+    permission_classes = (
+        ~IsTypist,
+        ~IsGuest,
+    )
+
     def get_target_test_dates(self, request):
         try:
             test_obj = Target_Test_Date.objects.filter(date__gt=date.today())

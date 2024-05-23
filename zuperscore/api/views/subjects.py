@@ -113,7 +113,11 @@ class SubjectNodeViewset(viewsets.ModelViewSet):
 
 
 class AllSubjectRoots(APIView):
-    permission_classes = ((~IsParent | ~IsCounselor | ~IsGuest),)
+    permission_classes = (
+        ~IsParent,
+        ~IsCounselor,
+        ~IsGuest,
+    )
 
     def get(self, request):
         state = request.GET.get("state")
@@ -242,6 +246,7 @@ class SubjectViewSet(BaseViewset):
             | read_only(IsUserManager)
             | IsPlatformAdmin
             | IsTutor
+            | ~IsTypist
             | IsManager
         ),
     )
@@ -303,8 +308,7 @@ class MegaDomainGetSerializer(BaseSerializer):
 class MegaDomainViewSet(BaseViewset):
     permission_classes = (
         (
-            ~IsGuest
-            | read_only(IsStudent)
+            read_only(IsStudent)
             | read_only(IsParent)
             | read_only(IsCounselor)
             | read_only(IsUserManager)
@@ -490,6 +494,7 @@ class ModuleTreeSerializer(BaseSerializer):
 
 
 class ModuleViewSet(BaseViewset):
+    permission_classes = (IsPlatformAdmin,)
     serializer_class = ModuleSerializer
     model = Module
     # fields = ["id", "name", "description", "sequence"]
@@ -644,8 +649,7 @@ class DomainViewSet(BaseViewset):
 
     permission_classes = (
         (
-            ~IsGuest
-            | read_only(IsStudent)
+            read_only(IsStudent)
             | read_only(IsParent)
             | read_only(IsCounselor)
             | read_only(IsUserManager)
@@ -836,8 +840,7 @@ class TopicGetSerializer(BaseSerializer):
 class TopicViewSet(BaseViewset):
     permission_classes = (
         (
-            ~IsGuest
-            | read_only(IsStudent)
+             read_only(IsStudent)
             | read_only(IsParent)
             | read_only(IsCounselor)
             | read_only(IsUserManager)
@@ -1049,8 +1052,7 @@ class SubTopicGetSerializer(BaseSerializer):
 class SubTopicViewSet(BaseViewset):
     permission_classes = (
         (
-            ~IsGuest
-            | read_only(IsStudent)
+             read_only(IsStudent)
             | read_only(IsParent)
             | read_only(IsCounselor)
             | read_only(IsUserManager)
@@ -1322,6 +1324,7 @@ class SessionTreeSerializer(BaseSerializer):
 
 
 class SessionPlanViewSet(BaseViewset):
+    permission_classes = (IsPlatformAdmin,)
     serializer_class = SessionPlanSerializer
     model = SessionPlan
 
@@ -1499,6 +1502,7 @@ class StudentModuleSerializer(BaseSerializer):
 
 
 class StudentModuleViewSet(BaseViewset, BasePaginator):
+    permission_classes = (IsPlatformAdmin,)
     serializer = StudentModuleSerializer
     model = StudentModule
 
@@ -1522,6 +1526,7 @@ class StudentDomainSerializer(BaseSerializer):
 
 
 class StudentDomainViewSet(BaseViewset, BasePaginator):
+    permission_classes = (IsPlatformAdmin,)
     serializer = StudentDomainSerializer
     model = StudentDomain
 
@@ -1544,6 +1549,7 @@ class StudentTopicSerializer(BaseSerializer):
 
 
 class StudentTopicViewSet(BaseViewset, BasePaginator):
+    permission_classes = (IsPlatformAdmin,)
     serializer = StudentTopicSerializer
     model = StudentTopic
 
@@ -1566,6 +1572,7 @@ class StudentSubTopicSerializer(BaseSerializer):
 
 
 class StudentSubTopicViewSet(BaseViewset, BasePaginator):
+    permission_classes = (IsPlatformAdmin,)
     serializer = StudentSubTopicSerializer
     model = StudentSubTopic
 
@@ -1724,6 +1731,8 @@ class StudentSessionPlanTreeSerializer(BaseSerializer):
             "mega_domain",
             "is_completed",
         ]
+
+
 class NewStudentSessionPlanTreeSerializer(BaseSerializer):
     session_plan = StudentSessionPlanSerializer(read_only=True)
     subject = SubjectSerializer()
@@ -1731,7 +1740,7 @@ class NewStudentSessionPlanTreeSerializer(BaseSerializer):
 
     class Meta:
         model = StudentSessionPlan
-        fields ="__all__"
+        fields = "__all__"
         # fields = [
         #     "id",
         #     "name",
@@ -1745,6 +1754,7 @@ class NewStudentSessionPlanTreeSerializer(BaseSerializer):
 
 
 class StudentSessionViewSet(BaseViewset, BasePaginator):
+    permission_classes = (IsPlatformAdmin,)
     serializer = StudentSessionPlanSerializer
     model = StudentSessionPlan
 
@@ -2169,7 +2179,7 @@ class CustomPagination(PageNumberPagination):
 
 
 class AssignmentViewSet(BaseViewset, BasePaginator):
-
+    permission_classes = ((IsPlatformAdmin | IsTypist),)
     serializer = AssignmentSerializer
 
     model = Assignment
@@ -2476,6 +2486,8 @@ class QuestionOptionSerializer(BaseSerializer):
 
 
 class AssignmentQuestionViewSet(BaseViewset, BasePaginator):
+    permission_classes = ((IsPlatformAdmin | IsTypist),)
+
     def list(self, request):
         assignment_id = request.GET.get("assignment")
         print("@@@@@@@@@@@@@@@", assignment_id)
@@ -2841,6 +2853,8 @@ class NewStudentAssignmentSerializer(BaseSerializer):
 
 
 class StudentAssignmentViewSet(BaseViewset, BasePaginator):
+    permission_classes = (IsPlatformAdmin,)
+
     def get_by_student_id(self, request, pk):
         serializer = StudentAssignmentSerializer(
             StudentAssignment.objects.filter(student_id=pk), many=True
@@ -2882,6 +2896,8 @@ class ReasonForErrorViewSet(BaseViewset):
 
 # code use to get custom api link created by suresh
 class Create_custom_Link(BaseViewset):
+    permission_classes = (IsPlatformAdmin,)
+
     def get_custom_link_data(self, request):
         data = [
             {
@@ -2907,6 +2923,7 @@ class Create_custom_Link(BaseViewset):
 
 
 class HomeAssignment(BaseViewset):
+    permission_classes = (IsPlatformAdmin,)
 
     def get_homeassignment(self, request):
         data = [
@@ -2944,6 +2961,7 @@ class NewModuleSerilializer(BaseSerializer):
 
 
 class ListModuleViewSet(BaseViewset):
+    permission_classes = (IsPlatformAdmin,)
     serializer_class = NewModuleSerilializer
     model = Module
     fields = ["id", "name", "description", "sequence"]
@@ -3159,6 +3177,7 @@ class GetMotherSessionMoleculeSerializer(BaseSerializer):
 
 
 class MoleculeViewSet(BaseViewset):
+    permission_classes = ((IsPlatformAdmin | IsTypist | IsManager),)
 
     def list(self, request):
 
@@ -3454,6 +3473,12 @@ class MotherSessionMoleculeSerializer(BaseSerializer):
 
 
 class MotherSessionMoleculeViewSet(BaseViewset):
+    permission_classes = (
+        ~IsGuest,
+        ~IsStudent,
+        ~IsParent,
+        ~IsCounselor,
+    )
 
     def create(self, request):
         session_plan_name = request.data.get("session_plan_name")
