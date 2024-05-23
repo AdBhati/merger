@@ -65,6 +65,45 @@ def get_tokens_for_user(user):
     )
 
 
+class RefreshAccessToken(APIView):
+    permission_classes = (AllowAny,)
+
+    def post(self, request):
+        refresh_token = request.data.get('refresh_token', False)
+        if refresh_token:
+            try:
+                decoded_token = RefreshToken(refresh_token)
+                user_id = decoded_token['user_id']
+                user = User.objects.get(id=user_id)
+
+                access_token, _ = get_tokens_for_user(user)
+                return Response({'access_token':access_token}, status=status.HTTP_201_CREATED)
+            
+            except User.DoesNotExist:
+                return Response(
+                    {
+                        "error": "Sorry, we could not find a user with the provided credentials. Please try again."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            
+            except Exception as e:
+                print('refresh error', e)
+                return Response(
+                    {
+                        "error" : "Something went wrong"
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+        else:
+            return Response(
+                    {
+                        "error": "Invalid or no refresh token."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
 class SignInEndpoint(APIView):
     permission_classes = (AllowAny,)
 

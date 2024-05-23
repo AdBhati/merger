@@ -6,6 +6,7 @@ from zuperscore.api.views.authentication import (
     SignInEndpoint,
     SignUpEndpoint,
     SignOutEndpoint,
+    RefreshAccessToken,
 )
 from .views.library import FileAssetEndpoint
 from zuperscore.api.views.people import PeopleView, TargetTestDateViewSet, UserViewSet, UserCustomFieldViewSet, SchoolViewSet,CommentViewSet,AllocateManagerViewSet,AllocateCounselorViewSet,FilterPeopleViewSet
@@ -132,6 +133,7 @@ from zuperscore.api.views.conduct import (
 from zuperscore.api.views.library import SettingsViewSet
 
 urlpatterns = [
+    path("auth/refresh-token/",RefreshAccessToken.as_view()),
     path("sign-in/", SignInEndpoint.as_view()),
     path("enroll-user/", SignUpEndpoint.as_view()),
     path("sign-out/", SignOutEndpoint.as_view()),
