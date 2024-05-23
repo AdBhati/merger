@@ -77,13 +77,20 @@ class UserMinimumSerializer(serializers.ModelSerializer):
             "about",
             "profile_img",
             "role",
+            "created_at",
+            "tutor_type",
+            "class_start_date",
             "is_onboarded",
             "is_english_writing_assigned",
             "is_english_reading_assigned",
             "is_math_assigned",
-            "tutor_type",
+            "user_timezone",
             "isRepeater",
+            "day_schedule_user_id",
+            "is_active",
         )
+
+
 
 
 class UserManagerFilterSerializer(UserMinimumSerializer):
@@ -336,29 +343,6 @@ class NewUserSerializer(serializers.ModelSerializer):
             "day_schedule_user_id",
         )
 
-
-class UserMinimumSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = (
-            "id",
-            "first_name",
-            "last_name",
-            "email",
-            "about",
-            "profile_img",
-            "role",
-            "created_at",
-            "tutor_type",
-            "class_start_date",
-            "is_onboarded",
-            "is_english_writing_assigned",
-            "is_english_reading_assigned",
-            "is_math_assigned",
-            "user_timezone",
-            "isRepeater",
-            "day_schedule_user_id",
-        )
 
 
 class UserTeachersSerializer(serializers.ModelSerializer):
