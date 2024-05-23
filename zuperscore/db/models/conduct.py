@@ -425,6 +425,8 @@ class StudentReadingCpeaReport(TimeAuditModel):
     meta_value_subtopic = models.CharField(max_length=255)
     meta_value_score = models.IntegerField(default=0)
     meta_value_skil_tested = models.CharField(max_length=255)
+    appointment = models.ForeignKey(Appointments, on_delete=models.CASCADE, default=None, null=True)
+    remedial_action = models.CharField(max_length=255)
     
     class Meta:
         db_table = 'student_reading_cpea'

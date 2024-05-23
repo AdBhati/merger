@@ -2856,13 +2856,19 @@ class ReadingCpeaBaseViewSet(BaseViewset):
         try:
             type = request.data.get('type')
             student_id = request.data.get('student_id')
-            mega_domain = request.data.get('mega_domain')
+            appointment = request.data.get('appointment')
             reports = request.data.get('reports')
+
+            if type == 'Reading':
+                mega_domain = MegaDomain.objects.get(name= 'Reading')
+                mega_domain_id = mega_domain.id
+                print("mega_domain_id==========>",mega_domain_id)
 
             for report_data in reports:
                 report_data['type'] = type
                 report_data['student'] = student_id
-                report_data['mega_domain'] = mega_domain
+                report_data['mega_domain'] = mega_domain_id
+                report_data['appointment'] = appointment
 
                 serializer = StudentReadingCpeaReportSerializer(data=report_data)
                 if serializer.is_valid():
