@@ -419,12 +419,14 @@ class StudentReadingCpeaReport(TimeAuditModel):
     type = models.CharField(max_length=80, default='Reading')
     student = models.ForeignKey(User, on_delete=models.CASCADE, default=None, null=True)
     mega_domain = models.ForeignKey(MegaDomain, on_delete=models.CASCADE, default=None, null=True)
-    meta_key= models.CharField(max_length=255)
+    meta_key= models.CharField(max_length=255, default='default_key')
     meta_value_reponse = models.CharField(max_length=255)
     meta_value_domain = models.CharField(max_length=255)
     meta_value_subtopic = models.CharField(max_length=255)
     meta_value_score = models.IntegerField(default=0)
     meta_value_skil_tested = models.CharField(max_length=255)
+    appointment = models.ForeignKey(Appointments, on_delete=models.CASCADE, default=None, null=True)
+    remedial_action = models.CharField(max_length=255)
     
     class Meta:
         db_table = 'student_reading_cpea'
