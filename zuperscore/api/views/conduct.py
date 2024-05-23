@@ -3684,10 +3684,10 @@ class GroupClassesBaseViewSet(BaseViewset):
 
 
 class AssignGroupClassesBaseViewSet(BaseViewset):
-    permission_classes = (
-        IsPlatformAdmin,
-        IsSsoManager,
-    )
+    # permission_classes = (
+    #     IsPlatformAdmin,
+    #     IsSsoManager,
+    # )
 
     def assign_group_classes(self, request, deptHead_id):
         try:
@@ -3844,7 +3844,7 @@ class StudentGroupEventBaseViewSet(BaseViewset):
 
 
 class AllotGroupClassBaseViewSet(BaseViewset):
-    # permission_classes = (IsPlatformAdmin,)
+    permission_classes = (IsPlatformAdmin,)
 
     def allot_group_classes(self, request):
         try:
