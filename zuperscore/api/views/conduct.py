@@ -2856,25 +2856,31 @@ class ReadingCpeaBaseViewSet(BaseViewset):
         try:
             type = request.data.get('type')
             student_id = request.data.get('student_id')
-            appointment = request.data.get('appointment')
+            appointment_id = request.data.get('appointment')
             reports = request.data.get('reports')
 
             if type == 'Reading':
                 mega_domain = MegaDomain.objects.get(name= 'Reading')
                 mega_domain_id = mega_domain.id
+            
+            appointment = Appointments.objects.get(id=appointment_id)
 
             for report_data in reports:
                 report_data['type'] = type
                 report_data['student'] = student_id
                 report_data['mega_domain'] = mega_domain_id
-                report_data['appointment'] = appointment
+                report_data['appointment'] = appointment_id
                 report_data['meta_key'] = 'default_key'
 
                 serializer = StudentReadingCpeaReportSerializer(data=report_data)
                 if serializer.is_valid():
                     serializer.save()
+
                 else:
                     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                
+            appointment.is_completed=True
+            appointment.save()
                 
             return Response({
             "success": True,
