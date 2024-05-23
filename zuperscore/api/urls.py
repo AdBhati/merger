@@ -126,6 +126,7 @@ from zuperscore.api.views.conduct import (
     # TeacherAppointmentFeedbackViewSet,
     ReportClassesViewSet,
     UnattendedClassesViewSet,
+    UnattendedCounterClassesViewSet,
     UsersTeamViewSet,
     
 )
@@ -595,6 +596,7 @@ urlpatterns = [
     path('conduct/student-cpea-report/<int:student_id>/',CpeaBaseViewSet.as_view({"get":"get_student_cpea_report"})),
     path('conduct/student-cpea-report/<int:student_id>/<int:appointment_id>',CpeaBaseViewSet.as_view({"put":"update_student_cpea_report"})),
     path('conduct/reading-student-cpea-report/',ReadingCpeaBaseViewSet.as_view({"post":"create_reading_cpea_report"})),
+    path('conduct/reading-student-cpea-report/<int:student_id>',ReadingCpeaBaseViewSet.as_view({"get":"get_by_id"})),
 
 
 
@@ -627,6 +629,6 @@ urlpatterns = [
     ),
     path("cpea/override/<int:student_id>/<str:mega_domains>", CpeaOverRideViewSet.as_view({"put": "cpea_override"})),  # added after merger
     path("conduct/unatteneded/classes/", UnattendedClassesViewSet.as_view({"get": "list"})),
-    path("conduct/unatteneded/counters_classes/", UnattendedClassesViewSet.as_view({"get": "counters_of_all_classes"}))
+    path("conduct/unatteneded/counters_classes/", UnattendedCounterClassesViewSet.as_view({"get": "counters_of_all_classes"}))
 
 ]
