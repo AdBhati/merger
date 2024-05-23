@@ -2862,13 +2862,13 @@ class ReadingCpeaBaseViewSet(BaseViewset):
             if type == 'Reading':
                 mega_domain = MegaDomain.objects.get(name= 'Reading')
                 mega_domain_id = mega_domain.id
-                print("mega_domain_id==========>",mega_domain_id)
 
             for report_data in reports:
                 report_data['type'] = type
                 report_data['student'] = student_id
                 report_data['mega_domain'] = mega_domain_id
                 report_data['appointment'] = appointment
+                report_data['meta_key'] = 'default_key'
 
                 serializer = StudentReadingCpeaReportSerializer(data=report_data)
                 if serializer.is_valid():
