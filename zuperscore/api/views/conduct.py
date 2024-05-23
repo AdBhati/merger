@@ -2784,17 +2784,17 @@ class AssignCategoryViewSet(BaseViewset):
                 math_score = int(data.get("score", {}).get("math", 0))
 
                 # Determine English category
-                if english_score > 650:
+                if english_score >= 670:
                     user.english_category = EnglishCategory.objects.get(name="T")
-                elif 550 <= english_score <= 650:
+                elif 550 <= english_score <= 660:
                     user.english_category = EnglishCategory.objects.get(name="S")
                 else:
                     user.english_category = EnglishCategory.objects.get(name="R")
 
                 # Determine Math category
-                if math_score > 650:
+                if math_score > 670:
                     user.math_category = MathCategory.objects.get(name="T")
-                elif 550 <= math_score <= 650:
+                elif 550 <= math_score <= 660:
                     user.math_category = MathCategory.objects.get(name="S")
                 else:
                     user.math_category = MathCategory.objects.get(name="R")
@@ -3409,6 +3409,7 @@ class StudentCpeaReportSerializer(serializers.ModelSerializer):
 
 
 class CpeaBaseViewSet(BaseViewset):
+
     permission_classes = ((IsPlatformAdmin | IsTutor | IsStudent),)
 
     def get_cpea_assignment(self, request, mega_domain):
