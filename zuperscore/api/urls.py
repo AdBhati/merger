@@ -55,7 +55,6 @@ from zuperscore.api.views.assessments import (
     WeeklyProgressViewSet,
     GenerateBulkAssessmentSessionView,
     TestIRTQuestionViewSet,
-    FetchQuestionViewSet,
 )
 
 from zuperscore.api.views.subjects import (
@@ -97,21 +96,37 @@ from zuperscore.api.views.library import SettingsViewSet,TimeZoneViewSet, TimeAn
 
 
 from zuperscore.api.views.conduct import (
+    
+    AllotGroupClassBaseViewSet,
+    AppointmentAgendaViewSet,
+    AppointmentAssignemntViewset,
+    AssignCategoryViewSet,
+    AssignGroupClassesBaseViewSet,
+    CalculateStudentAvailabilityViewSet,
+    CheckStudentGroupBaseViewSet,
+    CompletedClassViewSet,
     CpeaBaseViewSet,
     CpeaOverRideViewSet,
     GroupClassesBaseViewSet,
+    LastClassAgendaViewSet,
+    LastClassViewSet,
+    SsoStudentBaseViewSet,
     StudentCategoryViewSet,
     AppointmentViewSet,
     StudentAvailabilityViewSet,
     StudentDashBoardViewSet,
+    StudentGroupEventBaseViewSet,
+    StudentRelatedTeacherViewSet,
     # StudentJourneyViewSet,
     TeacherAppointmentFeedbackViewSet,
+    TeacherAppointmentViewSet,
     TutorDashBoradViewSet,
     # UserRoleProfileViewSet,
     TutorDashBoradViewSet,
     # TeacherAppointmentFeedbackViewSet,
     ReportClassesViewSet,
     UnattendedClassesViewSet,
+    UsersTeamViewSet,
     
 )
 
@@ -299,7 +314,7 @@ urlpatterns = [
         RenderAssessmentSessionView.as_view(),
         name="generate-assessment-session",
     ),
-    path("questions-by-ids/", FetchQuestionViewSet.as_view({"post": "questions_by_ids"})),
+    path("questions-by-ids/", QuestionViewSet.as_view({"post": "questions_by_ids"})),
     path(
         "users/assessments-sessions/sections/",
         UserAssessmentSessionSectionQuestionsView.as_view(),
@@ -496,37 +511,37 @@ urlpatterns = [
         "conduct/appointments/<int:pk>/",
         AppointmentViewSet.as_view({"get": "get_appointment", "put": "partial_update", "delete": "destroy"}),
     ),
-    path("conduct/appointments/create-zoom-session/", AppointmentViewSet.as_view({"post": "create_zoom_session"})),
+    # path("conduct/appointments/create-zoom-session/", AppointmentViewSet.as_view({"post": "create_zoom_session"})),
     path("conduct/appointments/admin-appointments/", AppointmentViewSet.as_view({"get": "get_all_appointments"})),
     path(
-        "conduct/appointments/teachers-appointments/", AppointmentViewSet.as_view({"get": "get_teachers_appointments"})
+        "conduct/appointments/teachers-appointments/", TeacherAppointmentViewSet.as_view({"get": "get_teachers_appointments"})
     ),
     path(
-        "conduct/appointments/student-molecules-assignment/<int:student_id>/<int:appointment_id>/", AppointmentViewSet.as_view({"get": "get_student_class_assignment"})
+        "conduct/appointments/student-molecules-assignment/<int:student_id>/<int:appointment_id>/", AppointmentAssignemntViewset.as_view({"get": "get_student_class_assignment"})
     ),
     path(
-        "conduct/appointments/student-molecules-home-assignment/<int:student_id>/<int:appointment_id>/", AppointmentViewSet.as_view({"get": "get_student_home_assignment"})
+        "conduct/appointments/student-molecules-home-assignment/<int:student_id>/<int:appointment_id>/", AppointmentAssignemntViewset.as_view({"get": "get_student_home_assignment"})
     ),
     path(
-        "conduct/appointments/student-assignment-question/<int:student_assignment_id>/", AppointmentViewSet.as_view({"get": "get_student_assignment_question"})
+        "conduct/appointments/student-assignment-question/<int:student_assignment_id>/", AppointmentAssignemntViewset.as_view({"get": "get_student_assignment_question"})
     ),  
     path(
-        "conduct/appointments/validate-answers/<int:student_id>/", AppointmentViewSet.as_view({"post": "correct_answer_for_questions"})
+        "conduct/appointments/validate-answers/<int:student_id>/", AppointmentAssignemntViewset.as_view({"post": "correct_answer_for_questions"})
     ),  
     path(
-        "conduct/appointments/update-student-assignment-question/", AppointmentViewSet.as_view({"post": "update_student_assignment_question"})
+        "conduct/appointments/update-student-assignment-question/", AppointmentAssignemntViewset.as_view({"post": "update_student_assignment_question"})
     ),  
     path(
-        "conduct/appointments/appointments-molecule/<int:student_id>/<int:tutor_id>", AppointmentViewSet.as_view({"get": "get_appointment_molecule"})
+        "conduct/appointments/appointments-molecule/<int:student_id>/<int:tutor_id>", AppointmentAgendaViewSet.as_view({"get": "get_appointment_molecule"})
     ),
     path(
-        "conduct/appointments/other-covered-agenda/<int:student_id>", AppointmentViewSet.as_view({"get": "get_other_covered_agenda"})
+        "conduct/appointments/other-covered-agenda/<int:student_id>", AppointmentAgendaViewSet.as_view({"get": "get_other_covered_agenda"})
     ),
     path(
         "conduct/appointments/update-appointments-molecule/<int:appointment_id>", AppointmentViewSet.as_view({"put": "updateMolecule"})
     ),
     path(
-        "conduct/appointments/student-related-teacher/", AppointmentViewSet.as_view({"get": "students_related_teacher"})
+        "conduct/appointments/student-related-teacher/", StudentRelatedTeacherViewSet.as_view({"get": "students_related_teacher"})
     ),
     path("conduct/appointments/day-scheduler-resources/", AppointmentViewSet.as_view({"get":"get_dayScheduler_resources"})),
    
@@ -536,16 +551,16 @@ urlpatterns = [
     path("conduct/appointments/get_student_teachers/<int:pk>/", AppointmentViewSet.as_view({"get":"get_student_teachers"})),
     path("conduct/appointments/slot-booking/<str:type>/", AppointmentViewSet.as_view({"post": "slot_booking"})),
     path("conduct/appointments/get-comming-classes/<int:invitee_id>/", AppointmentViewSet.as_view({"get":"get_coming_classes"})),
-    path("conduct/appointments/get-last-classes/<int:student_id>/", AppointmentViewSet.as_view({"get":"get_last_classes"})),
-    path("conduct/appointments/get-completed-classes/<int:student_id>/", AppointmentViewSet.as_view({"get":"get_completed_classes"})),
+    path("conduct/appointments/get-last-classes/<int:student_id>/", LastClassViewSet.as_view({"get":"get_last_classes"})),
+    path("conduct/appointments/get-completed-classes/<int:student_id>/", CompletedClassViewSet.as_view({"get":"get_completed_classes"})),
 
     path("conduct/appointments/get-all-users/", AppointmentViewSet.as_view({"get":"get_all_users"})),
-    path("molecule/createAppMolecule/",AppointmentViewSet.as_view({"post":"createAppointmentMolecules"})),
-    path("molecule/update-appointment-molecule-feedback/",AppointmentViewSet.as_view({"post":"update_appointment_molecules_and_feedback"})),
+    path("molecule/createAppMolecule/",AppointmentAgendaViewSet.as_view({"post":"createAppointmentMolecules"})),
+    path("molecule/update-appointment-molecule-feedback/",AppointmentAgendaViewSet.as_view({"post":"update_appointment_molecules_and_feedback"})),
      path(
         "conduct/appointments/create/", Create_custom_Link.as_view({"get": "get_custom_link_data"})
     ),
-    path("conduct/appointments/last-classes-agenda/", AppointmentViewSet.as_view({"get": "get_last_classes_agenda"})),
+    path("conduct/appointments/last-classes-agenda/", LastClassAgendaViewSet.as_view({"get": "get_last_classes_agenda"})),
     path(
         "home/assignment",HomeAssignment.as_view({"get":"get_homeassignment"})
     ),
@@ -564,11 +579,11 @@ urlpatterns = [
 
     path("student-availability/",StudentAvailabilityViewSet.as_view({"get": "list"})),
     path("student-availability/<int:pk>",StudentAvailabilityViewSet.as_view({"get": "get_by_id","delete":"destroy","post":"create"})),
-    path("calculate-availability/<int:student_id>",StudentAvailabilityViewSet.as_view({"get": "calculate_availability"})),
-    path("assign-category/<int:student_id>",StudentAvailabilityViewSet.as_view({"post": "assign_category"})),
-    path("student-team/",StudentAvailabilityViewSet.as_view({"post": "create_student_team","get": "user_list"})),
-    path("remove-student-team/<int:student_id>/<int:user_id>/",StudentAvailabilityViewSet.as_view({"delete":"delete_student_team"})),
-    path("student-team/<int:user_id>",StudentAvailabilityViewSet.as_view({"get": "get_user_teams"})),
+    path("calculate-availability/<int:student_id>",CalculateStudentAvailabilityViewSet.as_view({"get": "calculate_availability"})),
+    path("assign-category/<int:student_id>",AssignCategoryViewSet.as_view({"post": "assign_category"})),
+    path("student-team/",UsersTeamViewSet.as_view({"post": "create_student_team","get": "user_list"})),
+    path("remove-student-team/<int:student_id>/<int:user_id>/",UsersTeamViewSet.as_view({"delete":"delete_student_team"})),
+    path("student-team/<int:user_id>",UsersTeamViewSet.as_view({"get": "get_user_teams"})),
     path("student-availability/update/<int:student_id>",StudentAvailabilityViewSet.as_view({"put": "update_days"})),
     path("comment/create",CommentViewSet.as_view({"post":"create"})),
     path("comment/get-by-id/<int:user_id>",CommentViewSet.as_view({"get":"get_by_id"})),
@@ -584,11 +599,11 @@ urlpatterns = [
 
     path('conduct/student-cpea-questions/<str:mega_domain_name>',CpeaBaseViewSet.as_view({"get":"get_cpea_questions"})),
     path("conduct/appointments/day-scheduler-group-events/<int:student_id>", GroupClassesBaseViewSet.as_view({"get":"get_dayScheduler_group_events"})),
-    path("conduct/appointments/group-class-events/<int:deptHead_id>/", GroupClassesBaseViewSet.as_view({"post":"assign_group_classes"})),
-    path("conduct/appointments/allot-group-class/", GroupClassesBaseViewSet.as_view({"post":"allot_group_classes"})),
-    path("conduct/group-events/", GroupClassesBaseViewSet.as_view({"get":"get_student_group_events"})),
-    path("conduct/student-class-stats/<int:student_id>", GroupClassesBaseViewSet.as_view({"get":"check_student_group_assignment"})),
-    path("conduct/list-grouped-students/<uuid:group_id>", GroupClassesBaseViewSet.as_view({"get":"get_sso_students_by_group_id"})),
+    path("conduct/appointments/group-class-events/<int:deptHead_id>/", AssignGroupClassesBaseViewSet.as_view({"post":"assign_group_classes"})),
+    path("conduct/appointments/allot-group-class/", StudentGroupEventBaseViewSet.as_view({"post":"allot_group_classes"})),
+    path("conduct/group-events/", AllotGroupClassBaseViewSet.as_view({"get":"get_student_group_events"})),
+    path("conduct/student-class-stats/<int:student_id>", CheckStudentGroupBaseViewSet.as_view({"get":"check_student_group_assignment"})),
+    path("conduct/list-grouped-students/<uuid:group_id>", SsoStudentBaseViewSet.as_view({"get":"get_sso_students_by_group_id"})),
     path("conduct/appointment-report/<int:appointment_id>", ReportClassesViewSet.as_view({"post":"create"})),
     # path("report/student-journey/<int:student_id>",StudentJourneyViewSet.as_view({"get":"create_student_journey"})),
 

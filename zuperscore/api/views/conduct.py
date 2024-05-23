@@ -102,13 +102,6 @@ class SessionPlanSerializer(serializers.ModelSerializer):
     class Meta:
         model = SessionPlan
         fields = '__all__'
-
-# class AppointmentMoleculeSerializer(serializers.ModelSerializer):
-#     session_plan = SessionPlanSerializer()
-#     molecule = MoleculeSerializer()
-#     class Meta:
-#         model = AppointmentMolecule
-#         fields = '__all__'
         
 class SubTopicPracticeSheetSerializer(BaseSerializer):
     # topic = TopicSerializer()
@@ -125,7 +118,6 @@ class StudentAssignmentSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_subject(self, obj):
-        # This method checks if the subject is not None before trying to access its name attribute.
         return obj.subject.name if obj.subject else None
 
 
@@ -197,7 +189,6 @@ class AppointmentSerializer(BaseSerializer):
 class AppointmentMinimumSerializer(BaseSerializer):
     student = UserMinimumSerializer()
     student_count = serializers.IntegerField(read_only=True)
-    # host = UserMinimumSerializer()
 
     class Meta:
         model = Appointments
@@ -210,12 +201,6 @@ class TutorialSerializer(BaseSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'first_name', 'last_name', 'role']
-
-# class BookingSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Booking
-#         fields = '__all__'
-
 
 class BookingSerializer(BaseSerializer):
     class Meta:
@@ -246,11 +231,6 @@ class UserSerializer(serializers.ModelSerializer):
             "tutor_type",
               
         )
-
-# class MotherSessionMoleculeSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = MotherSessionMolecule
-#         fields = '__all__'
         
 class AppointmentFeedbackSerializers(serializers.ModelSerializer):
      class Meta:
@@ -268,10 +248,6 @@ class AppointmentMoleculeSerializers(serializers.ModelSerializer):
         model = AppointmentMolecule
         fields = '__all__'
 
-# class NewSubjectSerializers(serializers.ModelSerializer):
-#     class Meta:
-#         model = Subject
-#         fields = '__all__'
 
 class NewAppointmentSerializer(BaseSerializer):
     subject = SubjectSerializer()
@@ -346,9 +322,8 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
 
     def filter_by_name(self, name, logged_in_user_id):
         names = name.split()
-        print("names@@@@@@@",names)
         users = User.objects.filter(Q(id=logged_in_user_id) | Q(is_active=True))  
-        # print("users@@@@@@@@@@",users)
+        
 
         if len(names) == 1:
             first_name = names[0].lower()
@@ -364,787 +339,47 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
             )
         return users
     
-    def students_related_teacher(self, request):
-        logged_in_user_id = request.user.id
-        print("@@@@@@@@@@@@",logged_in_user_id)
-        name = request.GET.get("name", '')
-
-        try:
-            users = User.objects.get(id=logged_in_user_id, is_active=True)
-          # users = users.prefetch_related('english_reading_tutors','english_writing_tutors','math_tutors')
-
-            users = users.english_reading_tutors.all().distinct() | \
-                    users.math_tutors.all().distinct() | \
-                    users.english_writing_tutors.all().distinct()
-            
-            users=users.order_by('-created_at')
-
-
-            print('"@@@@@@@@@@@@@@',users)
-
-            if name and not name.strip():
-                return Response({"results":[]})
-
-            if name:
-
-                users = users.filter(Q(first_name__icontains=name) | Q(last_name__icontains=name) | Q(first_name__icontains=name.split()[0], last_name__icontains=name.split()[-1]))
-
-            paginator = CustomPageNumberPagination()
-            paginated_students = paginator.paginate_queryset(users, request)
-
-            serialized_students = UserMinimumSerializer(paginated_students, many=True).data
-
-            results = []
-            for student_data in serialized_students:
-                student_sessions = StudentSessionPlan.objects.filter(student_id=student_data["id"])
-                serialized_student_sessions = StudentSessionPlanSerializer(student_sessions, many=True).data
-
-                # student_availability = StudentAvailability.objects.filter(student_id=student_data["id"]).first()
-                student_availability = StudentAvailability.objects.filter(student_id=student_data["id"]).exclude(target_test_date_1__isnull = True).first()
-                serialized_availability = StudentAvailabilitySerializer(student_availability).data if student_availability else {}
-
-                teacher_student_session_dates = {
-                    "student_details": student_data,
-                    "student_sessions": serialized_student_sessions,
-                    "availability_details": serialized_availability,
-                }
-
-                results.append(teacher_student_session_dates)
-
-            return paginator.get_paginated_response(results)
-
-        except Exception as e:
-            print(f"Error in students_related_teacher: {str(e)}")
-            return Response({"error": "An error occurred"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    def get_appointment_molecule(self, request, student_id, tutor_id):
-            try:
-                total_number_of_classes= 0
-                per_day_molecule = 0
-                query_set_data = None
-
-                # tutor_subject_type = request.user.tutor_type
-                tutor_subject_type = User.objects.get(id=tutor_id).tutor_type 
-                print("tutor_subject_type===>",tutor_subject_type)
-                appointment_id = request.query_params.get('Appointment_Id', None)
-                print("Appointment id:&&&&&&",appointment_id)
-
-                if appointment_id:
-                    query_set_data = AppointmentMolecule.objects.filter(
-                        appointment_id=appointment_id,
-                        is_completed=True
-                    ).select_related('molecule')  
-
-                    molecules_list = [molecule.molecule for molecule in query_set_data]
-                    print("molecules_list===>",molecules_list)
-
-                    sorted_molecules = sorted(molecules_list, key=lambda x: int(re.search(r'\d+', x.title).group()) if re.search(r'\d+', x.title) else float('inf'))
-
-                    serializer = NewMoleculeSerializer(sorted_molecules, many=True)
-
-                    return Response({"results": serializer.data})
-                
-                else:
-                
-                    student_session_plans = StudentSessionPlan.objects.filter(student=student_id, is_active=True)
-                    print("student_session_plans===>",student_session_plans)
-                    
-                    for session_plan in student_session_plans:
-                        subject_name = session_plan.subject.name.lower()
-                        print("subject_name===>",subject_name)
-
-                        mega_domain_name = session_plan.mega_domain.name.lower() if session_plan.mega_domain else ""
-                        print("mega_domain_name===>",mega_domain_name)
-
-                        if subject_name == "english":
-                            if not (("reading" in mega_domain_name and tutor_subject_type == "english_reading") or
-                                    ("writing" in mega_domain_name and tutor_subject_type == "english_writing")):
-                                continue  
-
-                        elif subject_name == "math" and tutor_subject_type != "math":
-                            continue 
-            
-                        # if subject_name not in ["english", "math"] or subject_name != tutor_subject_type:
-                        #     continue
-
-                        total_number_of_molecule = MotherSessionMolecule.objects.filter(session_plan=session_plan.session_plan.id).count() 
-                        # print("total_number_of_molecule===>",total_number_of_molecule)
-
-                        category = session_plan.category.upper()
-                        
-                        # if tutor_subject_type == "english" and subject_name == "english":
-
-                        if subject_name == "english":
-                            print("===english===")
-                            if category == "R":
-                                
-                                total_number_of_classes = total_number_of_molecule/2 
-                                per_day_molecule = total_number_of_molecule/total_number_of_classes
-                            elif category == "S":
-                            
-                                total_number_of_classes = total_number_of_molecule/3 
-                                per_day_molecule = total_number_of_molecule/total_number_of_classes
-                            elif category == "T":
-                            
-                                total_number_of_classes = total_number_of_molecule/4 
-                                per_day_molecule = total_number_of_molecule/total_number_of_classes
-
-                        elif subject_name == "math":
-                            print("===math===")
-                            if category == "R":
-                                
-                                total_number_of_classes = total_number_of_molecule/2 
-                                per_day_molecule = total_number_of_molecule/total_number_of_classes
-                            elif category == "S":
-                                
-                                total_number_of_classes = total_number_of_molecule/3 
-                                per_day_molecule = total_number_of_molecule/total_number_of_classes
-                            elif category == "T":
-                            
-                                # number_of_molecule /= 4
-                                total_number_of_classes = total_number_of_molecule/4 # 9
-                                per_day_molecule = total_number_of_molecule/total_number_of_classes
-
-                        # Filtering out molecules already present in AppointmentMolecule
-                        existing_molecule_ids = AppointmentMolecule.objects.filter(appointment__student=student_id, is_completed=True).values_list('molecule_id', flat=True)
-
-                        # print("existing_molecule_ids===>",existing_molecule_ids)
-                    
-                        query_set_data = MotherSessionMolecule.objects.filter(session_plan=session_plan.session_plan.id).exclude(molecule_id__in=existing_molecule_ids)
-
-                        print("query_set_data==>",query_set_data)
-
-                        molecules_list = list(query_set_data)
-
-                        sorted_molecules = sorted(molecules_list, key=lambda x: int(re.search(r'\d+', x.molecule.title).group()) if re.search(r'\d+', x.molecule.title) else float('inf'))
-
-                        final_molecules = sorted_molecules[:math.ceil(per_day_molecule)]
-
-                        serializer = MotherSessionMoleculeSerializer(final_molecules, many=True)
-
-                        
-                    
-                        return Response({"results": serializer.data})
-
-                    return Response({"results": query_set_data})
-
-            except Exception as stacktrace:
-                print("Error Occurred:", stacktrace)
-                return Response({"error": "An error occurred while processing the request"}, status=500)
-            
-    
-    def createAppointmentMolecules(self, request):
-        try:
-            molecules_data = request.data.get('molecules',[])
-            appointment_id = request.data.get('appointment_id')
-
-            appointment= get_object_or_404(Appointments,pk=appointment_id)
-
-            for molecule_id in molecules_data:
-                if not AppointmentMolecule.objects.filter(appointment=appointment, molecule_id=molecule_id).exists():
-                    AppointmentMolecule.objects.get_or_create(
-                        appointment=appointment,
-                        molecule_id=molecule_id,
-                        is_completed=False
-                    )
-            return Response({'message': 'Molecules Saved..!!'}, status=status.HTTP_200_OK)
-        except Exception as e:
-            print("Error Occurred:", e)
-            return Response({"error": "An error occurred while processing the request"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-    def update_appointment_molecules_and_feedback(self, request):
-        try:
-            molecules_data = request.data.get('molecules', [])
-            appointment_id = request.data.get('appointment_id')
-            feedback_data = request.data.get('feedback', {})  
-            feedback_questions = request.data.get('feedback_questions', [])
-
-            appointment = get_object_or_404(Appointments, pk=appointment_id)
-
-            user_type = request.user.role
-            commenter_type = 'tutor' if user_type == 'tutor' else 'user'
-           
-            if user_type == 'tutor':
-                for molecule_id in molecules_data:
-                    AppointmentMolecule.objects.update_or_create(
-                        appointment=appointment,
-                        molecule_id=molecule_id,
-                        defaults={'is_completed': True}
-                    )
-            elif user_type == 'user':
-
-                molecules_data_str = list(map(str, molecules_data))
-
-                appointment_molecules = AppointmentMolecule.objects.filter(appointment=appointment)
-
-                for molecule in appointment_molecules:
-
-                    if str(molecule.molecule_id) in molecules_data_str:
-                            molecule.is_completed = True
-                    else:
-                            molecule.is_completed = False
-                    molecule.save()
-
-            feedback = FeedBack.objects.create(
-                comment=feedback_data.get('comment'),
-                student_id=feedback_data.get('student_id'),
-                tutor_id=feedback_data.get('tutor_id'),
-                appointment=appointment,
-                commenter=commenter_type,
-            )
-            
-            for feedback_question in feedback_questions:
-                question_id = feedback_question.get('question_id')
-                rating = feedback_question.get('rating')
-                question = get_object_or_404(FeedbackQuestions, pk=question_id)
-                FeedbackQuestionRating.objects.create(
-                    feedback=feedback,
-                    question=question,
-                    rating=rating
-                )
-            
-            appointment.is_completed = True
-            if user_type == 'tutor':
-                print("enter in tutor side")
-                print("saving in tutor side")
-                western_time = pytz.timezone('Asia/Kolkata')
-                appointment.end_at = western_time.localize(datetime.now())
-
-
-            appointment.save()
-
-            return Response({'message': 'Feedback and molecules updated successfully.'}, status=status.HTTP_200_OK)
-        
-        except Exception as e:
-            return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-                 
-
-    def get_other_covered_agenda(self, request, student_id):
-        try:
-            tutor_subject_type = request.user.tutor_type
-            print("tutor_subject_type-->",tutor_subject_type)
-
-            excluded_molecule_ids = AppointmentMolecule.objects.filter(
-                appointment__student=student_id,
-                # is_completed=False,
-            ).values_list('molecule_id', flat=True)
-
-            print('excluded_molecule_ids-->',excluded_molecule_ids)
-
-            student_session_plans = StudentSessionPlan.objects.filter(student=student_id)
-            # print("student_session_plans @@@@@@@====>>>",student_session_plans)
-
-            print('student_session_plans===>',student_session_plans)
-
-            eligible_molecules = []
-
-            for session_plan in student_session_plans:
-                subject_name = session_plan.subject.name.lower() if session_plan.subject else ""
-                mega_domain_name = session_plan.mega_domain.name.lower() if session_plan.mega_domain else ""
-                if subject_name == "english":
-                    print("english-->")
-
-                    if (("reading" in mega_domain_name and tutor_subject_type == "english_reading") or
-                        ("writing" in mega_domain_name and tutor_subject_type == "english_writing")):
-
-                        queryset = MotherSessionMolecule.objects.filter(
-                            session_plan=session_plan.session_plan.id
-                        ).exclude(molecule_id__in=excluded_molecule_ids)
-
-                        print("queryset english==>", queryset)
-                        
-                        molecules_list = list(queryset)
-                        
-                        sorted_molecules = sorted(
-                            molecules_list, 
-                            key=lambda x: (x.molecule.title[0], int(re.search(r'\d+', x.molecule.title).group()) if re.search(r'\d+', x.molecule.title) else 0)
-                        )
-                        
-                        molecules = molecules_list[:2]
-                        
-                        eligible_molecules.extend(molecules)
-
-                elif subject_name == "math" and tutor_subject_type == "math":
-                    print('math==>')
-
-                    queryset = MotherSessionMolecule.objects.filter(
-                        session_plan=session_plan.session_plan.id
-                    ).exclude(molecule_id__in=excluded_molecule_ids)
-
-                    print("queryset math--->",queryset)
-
-                    molecules_list = list(queryset)
-                    
-                    sorted_molecules = sorted(molecules_list, key=lambda x: (x.molecule.title[0], int(re.search(r'\d+', x.molecule.title).group()) if re.search(r'\d+', x.molecule.title) else 0))
-                    
-                    molecules = sorted_molecules[:2]
-                    
-                    eligible_molecules.extend(molecules)
-
-            serializer = MotherSessionMoleculeSerializer(eligible_molecules, many=True)
-            return Response({"results": serializer.data})
-
-        except Exception as e:
-            print("Error Occurred:", e)
-            return Response({"error": "An error occurred while processing the request"}, status=500)
-        
-       
-    def get_last_classes_agenda(self, request):
-        mega_domain = request.query_params.get('megadomain')
-        student_id = request.query_params.get('student_id')
-        
-        last_completed_appointment = Appointments.objects.filter(
-            student_id=student_id, 
-            mega_domain=mega_domain.lower(), 
-            is_completed=True
-        ).order_by('-start_at').first()
-        
-        if last_completed_appointment:
-            last_classes_agenda = AppointmentMolecule.objects.filter(
-                appointment=last_completed_appointment, 
-                is_completed=True
-            )
-            molecule=last_classes_agenda.values_list('molecule', flat=True)
-
-            molecule_topic_subtopic=MoleculeTopicSubtopic.objects.filter(molecule_id__in=molecule)
-
-            home_assignment_status =StudentAssignment.objects.filter(subtopic__in=molecule_topic_subtopic.values_list('subtopic', flat=True),student_id=student_id,type="HOME",is_completed=True).exists()
-
-            # home_assignment_status = StudentAssignment.objects.filter(
-            #     student_id=student_id, 
-            #     is_completed=True, 
-            #     type="HOME"
-            # ).exists()
-
-         
-            appointment_serializer = NewAppointmentSerializer(last_completed_appointment)
-            last_class_agenda_serializers = AppointmentMoleculeSerializers(last_classes_agenda, many=True)
-            
-          
-            appointment_data = appointment_serializer.data
-            appointment_data['molecules'] = last_class_agenda_serializers.data
-            appointment_data['home_assignments'] = home_assignment_status
-            
-            return Response({
-                    "sucess": True, 
-                    "status": "success",
-                    "message":"Last Class Detail",
-                    "results": [appointment_data],
-                })
-        else:
-            return Response({"results": []})
-
-
-    def get_teachers_appointments(self, request):
-        host_id = request.user.id
-        now = timezone.now()
-        sort_order= request.query_params.get('sort_order', 'desc')
-        appointment_status= request.query_params.get('status')
-        appointments = Appointments.objects.filter(host_id=host_id)
-
-        search = request.query_params.get('search', None)
-        print("appointments============>>>>>",appointments)
-
-        if search and not search.strip():
-                return Response({"results":[]})
-
-        if search:
-            appointments = appointments.filter(Q(student__first_name__icontains=search) | Q(student__last_name__icontains=search) | Q(student__first_name__icontains=search.split()[0], student__last_name__icontains=search.split()[-1])|Q(title=search))
-
-        if appointment_status == 'completed':
-            # completed_margin = now - timedelta(hours=1, minutes=30)
-            appointments = appointments.filter(Q(is_completed=True) | (Q(start_at__lt=now - timedelta(hours=1, minutes=30)) & Q(is_completed=False))).exclude(status__in=['CANCELLED', 'RESCHEDULED']).order_by("-start_at")
-
-        elif appointment_status == 'upcoming':
-            # upcoming_margin = now + timedelta(hours=1, minutes=30)
-            # appointments = appointments.filter(Q(is_completed=False) & Q(start_at__gt=now) & Q(start_at__gte=upcoming_margin))
-            appointments = appointments.filter(is_completed=False).exclude(status__in=['CANCELLED', 'RESCHEDULED'])
-
-    
-        if sort_order == 'asc':
-            appointments = appointments.filter(host_id=host_id).order_by('start_at')
-
-        else :
-            appointments = appointments.filter(host_id=host_id).order_by('-start_at')
-
-        appointments = appointments.annotate(student_count=Count('student'))
-        appointments = list(appointments)
-        serializer = AppointmentMinimumSerializer(appointments, many=True).data
-            
-        modified_appointments = []
-        appointment_resource_grouping_map = {}
-        groupedAppointId = set()
-        response_data=[]
-
-        for app in serializer:
-            if app['type'] == 'group_class':
-                if app['resource_id'] in appointment_resource_grouping_map:
-                    appointment_resource_grouping_map[app['resource_id']].append(app['student'])
-                    
-                else:
-                    appointment_resource_grouping_map[app['resource_id']] = [app['student']]
-                    groupedAppointId.add(app['id'])
-
-        paginator = CustomPageNumberPagination()
-        paginated_appointments = paginator.paginate_queryset(appointments, request)
-        
-        
-        for appointment in appointments:
-            appointment_filter = {'appointment_id': appointment.id}
-
-            has_molecules = AppointmentMolecule.objects.filter(
-                appointment__id=appointment.id,
-                **appointment_filter
-            ).exists()
-            
-            completed_assignments = AppointmentMolecule.objects.filter(
-                appointment__id=appointment.id,
-                **appointment_filter,
-            ).values_list('molecule_id', flat=True)
-            
-            related_subtopics = MoleculeTopicSubtopic.objects.filter(
-                molecule_id__in=completed_assignments
-            ).values_list('subtopic_id', flat=True)
-            
-            related_assignments = StudentAssignment.objects.filter(
-                subtopic_id__in=related_subtopics,
-                student_id=appointment.student_id,
-                type="CLASS",
-            )
-            total_assignments_count = related_assignments.count()
-
-            if total_assignments_count == 0:
-                class_assignment_completed = False
-            else:
-                completed_assignments_count = related_assignments.filter(is_completed=True).count()
-                class_assignment_completed = total_assignments_count == completed_assignments_count
-
-
-            appointment_data = AppointmentMinimumSerializer(appointment).data
-            appointment_data['class_assignment_complete'] = class_assignment_completed
-            appointment_data['has_molecules'] = has_molecules 
-
-            if appointment_data['type'] == 'group_class':
-                appointment_data['student_count'] = len(appointment_resource_grouping_map.get(appointment_data['resource_id'], []))
-
-
-            appointment_obj=AppointmentReport.objects.filter(appointment=appointment.id).first()
-            appointment_data['is_tutor_joined']=appointment_obj.is_tutor_joined if appointment_obj else False
-
-            modified_appointments.append(appointment_data)
-         
-        for app in modified_appointments:
-            if app['type'] == 'group_class' and app['id'] in groupedAppointId:
-                app['student'] = appointment_resource_grouping_map[app['resource_id']]
-                response_data.append(app)
-            elif app['type'] == 'group_class' :#add
-                print("group class", app['id'])#add
-            if app['type'] != 'group_class': 
-                response_data.append(app)
-        print("response_data====>",len(response_data))
-        paginator = CustomPageNumberPagination()
-        paginated_appointments = paginator.paginate_queryset(response_data, request)#add
-        print("response_data====>",len(paginated_appointments))
-        return paginator.get_paginated_response(paginated_appointments)
-    
-
-
-    def alphanumeric_sort(s):
-            parts = []
-            current_part = ''
-
-            for char in s:
-                if char.isdigit():
-                    current_part += char
-                else:
-                    if current_part:
-                        parts.append(int(current_part))
-                        current_part = ''
-                    parts.append(char)
-            
-            if current_part:
-                parts.append(int(current_part))
-
-            return parts
-
-    
-    def get_student_class_assignment(self, request, student_id, appointment_id=None):  
-        
-        try:
-            # print("student_category=====>",student_category)
-            appointment_filter = {}
-
-            if appointment_id:
-                appointment_filter['appointment_id'] = appointment_id
-
-            completed_molecules = AppointmentMolecule.objects.filter(
-            appointment__student_id=student_id,
-            **appointment_filter,
-            ).values_list('molecule_id', flat=True)
-
-            # print("completed_molecules===>",completed_molecules)
-
-            related_subtopics = MoleculeTopicSubtopic.objects.filter(
-            molecule_id__in=completed_molecules
-            ).values_list('subtopic_id', flat=True)
-
-            print("related_subtopics=====>",related_subtopics)
-
-            related_assignments = StudentAssignment.objects.filter(
-            subtopic_id__in=related_subtopics,
-            student_id=student_id,
-            type="CLASS",
-            )
-            related_assignments = related_assignments.annotate(
-                        assignment_length=Length('name')
-                    ).order_by('assignment_length', 'name')
-            
-            # related_assignments = list(sorted(related_assignments, key=lambda obj:obj.name))
-            # print("related_assignments&&&&&&&&&&&=====",related_assignments)
-            total_assignments_count = related_assignments.count()
-            # total_assignments_count = len(related_assignments)
-            
-            if total_assignments_count == 0:
-                class_assignment_completed = False
-            else:
-                completed_assignments_count = related_assignments.filter(is_completed=True).count()
-                class_assignment_completed = total_assignments_count == completed_assignments_count
-
-            # print("related_assignments=====>",related_assignments)
-
-            # serializer = StudentAssignmentSerializer(student_assignments, many=True)
-            serializer = StudentAssignmentSerializer(related_assignments, many=True)
-            print("=====?")
-
-            response_data = {
-            'assignments': serializer.data,
-            'class_assignment_completed': class_assignment_completed
-            }
-
-            return Response(response_data)
-        
-        except Exception as e:
-            print("Exception ====> ", e)
-            return Response(
-                {"success": False, "error": "Something went wrong"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-
-    def get_student_home_assignment(self, request, student_id, appointment_id=None):
-        try:
-            appointment_filter = {}
-
-            if appointment_id:
-                appointment_filter['appointment_id'] = appointment_id
-
-            completed_molecules = AppointmentMolecule.objects.filter(
-                appointment__student_id=student_id,
-                is_completed=True,
-                **appointment_filter,
-            ).values_list('molecule_id', flat=True)
-
-            print("completed_molecules==>",completed_molecules)
-
-            related_subtopics = MoleculeTopicSubtopic.objects.filter(
-                molecule_id__in=completed_molecules
-            ).values_list('subtopic_id', flat=True)
-
-
-            related_assignments = StudentAssignment.objects.filter(
-                subtopic_id__in=related_subtopics,
-                student_id=student_id,
-                type="HOME",
-                is_active = True,
-            ).select_related('subject').prefetch_related(
-                'student_assignment_questions__student_question_options'
-            )
-            
-            related_assignments = related_assignments.annotate(
-                        assignment_length=Length('name')
-                    ).order_by('assignment_length', 'name')  
-            
-
-            total_assignments_count = related_assignments.count()
-            
-            if total_assignments_count == 0:
-                home_assignment_completed = False
-            else:
-                completed_assignments_count = related_assignments.filter(is_completed=True).count()
-                home_assignment_completed = total_assignments_count == completed_assignments_count
-
-            serializer = StudentHomeAssignmentSerializer(related_assignments, many=True)
-
-            response_data = {
-                'assignments': serializer.data,
-                'home_assignment_completed': home_assignment_completed
-            }
-
-            return Response(response_data)
-
-        except Exception as e:
-            print("Exception ====> ", e)
-            return Response(
-                {"success": False, "error": "Something went wrong"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        
-    def get_student_assignment_question(self, request, student_assignment_id):
-        try:
-            student_assignment = StudentAssignment.objects.get(pk=student_assignment_id)
-            print("Student assignment", student_assignment)
-
-            student_assignment_serialized = StudentAssignmentSerializer(student_assignment).data
-
-            questions = StudentAssignmentQuestion.objects.filter(student_assignment=student_assignment).prefetch_related('student_question_options')
-            questions_serialized = StudentAssignmentQuestionSerializer(questions, many=True).data
-
-            for question in questions_serialized:
-                question.pop('student_assignment', None)
-
-            response_data = {
-                "student_assignment": student_assignment_serialized,
-                "questions": questions_serialized
-            }
-
-            return Response(response_data)
-        except StudentAssignment.DoesNotExist:
-            return Response({'error': 'StudentAssignment not found'}, status=404)
-        
-
-
-    def update_student_assignment_question(self, request):
-        questions = request.data.get('questions', [])
-        is_submit_clicked = request.data.get('is_submit_clicked', False)
-        student_assignment_ids = set()  
-
-        for question in questions:
-            student_assignment_id = question.get('student_assignment_id')
-            if student_assignment_id is not None:
-                student_assignment_ids.add(student_assignment_id)  
-            
-            options = question.get('student_question_options', [])
-            for option in options:
-                option_id = option.get('id')
-                is_correct = option.get('is_correct', False)
-                
-                try:
-                    question_option = StudentQuestionOption.objects.get(
-                        id=option_id, 
-                        student_assignment_question__id=question.get('id')  
-                    )
-                    
-                    question_option.is_correct = is_correct
-                    question_option.save()
-                except StudentQuestionOption.DoesNotExist:
-                    continue
-        
-        messages = []
-   
-        for student_assignment_id in student_assignment_ids:
-            try:
-                student_assignment = StudentAssignment.objects.get(pk=student_assignment_id)
-   
-                if is_submit_clicked:
-                    student_assignment.is_completed = True
-                    student_assignment.save()
-                    messages.append(f"Assignment {student_assignment_id} marked as completed successfully.")
-                else:
-                    pass
-            except StudentAssignment.DoesNotExist:
-                messages.append(f"StudentAssignment {student_assignment_id} not found.")
-
-        if not messages:
-            messages.append("No updates were made.")
-        
-        return Response({"messages": messages}, status=status.HTTP_200_OK)
-        
-    
-    
-    def correct_answer_for_questions(self, request, student_id):
-        question_ids = request.data.get('question_ids', [])
-        results = []
-
-        student_answers_qs = StudentQuestionOption.objects.filter(
-            student_assignment_question__assignment_question__in=question_ids,
-            student__id=student_id
-        ).select_related('question_option', 'student_assignment_question')
-
-        for question_id in question_ids:
-            correct_options_qs = QuestionOption.objects.filter(
-                questions_id=question_id, 
-                is_correct=True
-            ).prefetch_related('questions')
-
-            correct_options_serializer = QuestionOptionSerializer(correct_options_qs, many=True)
-
-            # Filter student_answers for the current question
-            filtered_student_answers = [
-                ans for ans in student_answers_qs
-                if ans.student_assignment_question.assignment_question_id == question_id
-            ]
-
-            validation = [{
-                "student_option_id": answer.id,
-                "selected_option_id": answer.question_option.id if answer.question_option else None,
-                "is_correct": answer.is_correct
-            } for answer in filtered_student_answers]
-
-            results.append({
-                "question_id": question_id,
-                "correct_options": correct_options_serializer.data,
-                "student_selection": validation
-            })
-
-        return Response(results)
-    
-
-    # ---------------------  Generate zoom access token  ----------------------
-    def create_zoom_session(self, request):
-        zoom_link = generate_zoom_link(request)
-        user = User.objects.get(pk=request.data["host"])
-
-        if zoom_link["data"]:
-            calendar_saved = generate_calendar_token(zoom_link["data"]["join_url"], request, user)
-
-            if calendar_saved["data"]:
-                if not user.role == "tutor":
-                    return Response("user role is not teacher")
-                request.data["zoom_link"] = zoom_link["data"]["join_url"]
-                request.data["created_by_ip"] = get_client_ip(request)
-                request.data["updated_by_ip"] = get_client_ip(request)
-
-                user_id = request.user.id
-                request.data["created_by"] = user_id
-                request.data["updated_by"] = user_id
-
-                serializer = AppointmentSerializer(data=request.data)
-                if serializer.is_valid():
-                    serializer.save()
-                    data = {
-                        "appointment": serializer.data["id"],
-                        "attendee": user_id,
-                        "type": request.user.role,
-                        "join_time": zoom_link["data"]["start_time"],
-                    }
-
-                    attSerializer = AttendeeSerializer(data=data)
-                    if attSerializer.is_valid():
-                        attSerializer.save()
-                        return Response({"data": serializer.data})
-                    else:
-                        return Response({"error": "invalid attSerializer"})
-                return Response({"error": serializer.errors})
-
-            else:
-                return Response({"error": calendar_saved["error"]})
-        elif zoom_link["error"]:
-            return Response({"error": zoom_link["error"]})
-    #----------------------------------------------------------------
-        
-   
+        # ---------------------  Generate zoom access token  ----------------------
+    # def create_zoom_session(self, request):
+    #     zoom_link = generate_zoom_link(request)
+    #     user = User.objects.get(pk=request.data["host"])
+
+    #     if zoom_link["data"]:
+    #         calendar_saved = generate_calendar_token(zoom_link["data"]["join_url"], request, user)
+
+    #         if calendar_saved["data"]:
+    #             if not user.role == "tutor":
+    #                 return Response("user role is not teacher")
+    #             request.data["zoom_link"] = zoom_link["data"]["join_url"]
+    #             request.data["created_by_ip"] = get_client_ip(request)
+    #             request.data["updated_by_ip"] = get_client_ip(request)
+
+    #             user_id = request.user.id
+    #             request.data["created_by"] = user_id
+    #             request.data["updated_by"] = user_id
+
+    #             serializer = AppointmentSerializer(data=request.data)
+    #             if serializer.is_valid():
+    #                 serializer.save()
+    #                 data = {
+    #                     "appointment": serializer.data["id"],
+    #                     "attendee": user_id,
+    #                     "type": request.user.role,
+    #                     "join_time": zoom_link["data"]["start_time"],
+    #                 }
+
+    #                 attSerializer = AttendeeSerializer(data=data)
+    #                 if attSerializer.is_valid():
+    #                     attSerializer.save()
+    #                     return Response({"data": serializer.data})
+    #                 else:
+    #                     return Response({"error": "invalid attSerializer"})
+    #             return Response({"error": serializer.errors})
+
+    #         else:
+    #             return Response({"error": calendar_saved["error"]})
+    #     elif zoom_link["error"]:
+    #         return Response({"error": zoom_link["error"]})
     #----------------------------------------------------------------
 
     def get_student_teachers(self, request, pk):
@@ -1152,7 +387,6 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
             subject = request.query_params.get('subject', None)
             cpea = request.query_params.get('cpea', None)
             slug = request.query_params.get('slug')
-            print(f"Subject: {subject}")
             student = User.objects.get(pk=pk)
             serializer = UserSerializer(student)
             english_reading_tutors = student.english_reading_tutors.all()
@@ -1161,13 +395,11 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
             
             if subject == 'math':
                 tutors = math_tutors
-                print("enter in math")
             elif subject == 'english_reading':
                 tutors = english_reading_tutors
             elif subject == 'english_writing':
                 tutors = english_writing_tutors
             else:
-            # tutors = list(chain(english_reading_tutors,english_writing_tutors, math_tutors))
                 tutors = english_reading_tutors.union(english_writing_tutors, math_tutors)
 
             if cpea:
@@ -1175,10 +407,6 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 tutors = cpea_enabled_tutors.exclude(id__in=tutors.values_list('id', flat=True))
                 if subject in ['math', 'english_reading', 'english_writing']:
                     tutors = tutors.filter(tutor_type=subject)
-
-
-            print(f"Subject: {subject}")
-            # print(f"Tutors====>: {UserBaseSerializer(tutors,many=True).data}")
 
             all_responses = []
 
@@ -1220,9 +448,7 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 "last_name": student.last_name,
                 "is_active": student.is_active,
                 "role": student.role,
-                "tutors_detail":all_responses,
-                # "day_schedule_user_id": student.day_schedule_user_id,
-                
+                "tutors_detail":all_responses,                
             }
 
             return Response(
@@ -1231,7 +457,6 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                     "status": "success",
                     "message": "",
                     "results": [filtered_student],
-                    # "all_tutors": [tutors_serializer.data]
                 }
             )
         
@@ -1257,9 +482,7 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
         subject_tutors = User.objects.filter(tutor_type=mega_domain.lower(), role='tutor', day_schedule_user_id__isnull=False)
 
         cpea = request.query_params.get('cpea', None)
-        print("admin side cpea:",cpea)
         if cpea:
-            print("enter in if cpea admin side")
             subject_tutors = subject_tutors.filter(is_cpea_eligible=True)
         
         assigned_tutor = None
@@ -1271,12 +494,8 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
         if assigned_tutor:
             subject_tutors = [assigned_tutor] + [tutor for tutor in subject_tutors if tutor != assigned_tutor]
 
-        
-        
         all_responses = []
-
         for tutor in subject_tutors:
-            print("tutors id is ===========>>>>",tutor.day_schedule_user_id)
             tutor_data_response = self.get_dayScheduler_resource_by_id(request, tutor.day_schedule_user_id, slug)
             # print("")
             if tutor_data_response.status_code == 200:
@@ -1290,7 +509,6 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                     "tutor_id": tutor.day_schedule_user_id,
                     "users_list": tutor_data
                 })
-
                                 
         return Response(
             {
@@ -1309,20 +527,14 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
         mega_domain = request.query_params.get('mega_domain', None)
         cpea = request.query_params.get('cpea', None)
         slug = request.query_params.get('slug')
-        print(f"Subject: {mega_domain}")
-        print(f"Slug: {slug}")
-        print(f"cpea: {cpea}")
 
         if request.user.role == "admin":
-            print("Role is",request.user.role)
             return self.admin_all_tutor_list(mega_domain, request, id,slug)
         
         student = User.objects.get(pk=id)
-        # serializer = UserSerializer(student)
         english_reading_tutors = student.english_reading_tutors.all()
         english_writing_tutors = student.english_writing_tutors.all()
         math_tutors = student.math_tutors.all()
-        # tutor_data= None
 
         if mega_domain == 'math':
             tutors = math_tutors
@@ -1592,13 +804,12 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
         except Exception as e:
             print("Error Occurred:", e)
             return Response({"error": "Internal Server Error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
 
-#----------------------------------------------------------------
-  
     def get_coming_classes(self, request, invitee_id):
        
         try:
-            bookings = Appointments.objects.filter(invitee_id=invitee_id).exclude(status__in=['CANCELLED', 'RESCHEDULED']).select_related('host')
+            bookings = Appointments.objects.filter(invitee_id=invitee_id).exclude(status__in=['CANCELLED', 'RESCHEDULED']).select_related('host').order_by("start_at")
             serializer = AppointmentSerializer(bookings, many=True)
             data = serializer.data
            
@@ -1666,8 +877,792 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
             })
         except Exception as e:
             return Response({"error": str(e)}, status=500)
+    
+    def get_dayScheduler_booking(self, request, booking_id):
+        print("enter")
+        get_all_users_url = f"https://api.dayschedule.com/v1/bookings/{booking_id}"
+
+        headers = {
+            "Content-Type": "application/json",   
+        }
+
+        params ={
+            "apiKey": "AOthHfwumTELV7qUslLHRNxeOpObRhvp"
+        }
+
+        try: 
+            response = requests.get(get_all_users_url, headers=headers, params=params)
+            if response.status_code == 200:
+                users_list = response.json()
+                return Response({"users_list": users_list})
+                
+            else :
+                return Response({"error": "Failed to retrieve booking info, status code: {}".format(response.status_code)}, status=response.status_code)
+
+        except Exception as e:
+            print("Error Occured:", e)
+            return Response({"error": "An error occurred while retrieving booking information."}, status=500)
         
+
+        #Get api for admin to see all users by create suresh
+    def get_all_users(self, request):
+        get_appointments_url = f"https://api.dayschedule.com/v1/bookings"
+
+        headers = {
+            "Content-Type":"application/json",
+        }
+
+        params = {
+            "apiKey": "AOthHfwumTELV7qUslLHRNxeOpObRhvp"
+        }
+
+        try:
+            response = requests.get(get_appointments_url, headers=headers, params=params)
+            
+            if response.status_code == 200:
+                page_list = response.json().get("result",[])
+                print(f"Page List: {page_list}")
+                return Response({"page_list": page_list})
+            
+            else :
+                return Response({"error": response.status_code}, status=response.status_code)
+
+        except Exception as e:
+            print("Error Occured:", e)     
+
+    def get_appointments(self, request,tutor_id):
+        get_appointments_url = f"https://api.dayschedule.com/v1/pages/"
+
+        headers = {
+            "Content-Type":"application/json",
+        }
+
+        params = {
+            "id":tutor_id,
+            "apiKey": "AOthHfwumTELV7qUslLHRNxeOpObRhvp"
+        }
+
+        try:
+            response = requests.get(get_appointments_url, headers=headers, params=params)
+            
+            if response.status_code == 200:
+                page_list = response.json().get("result",[])
+                print(f"Page List: {page_list}")
+                return Response({"page_list": page_list})
+            
+            else :
+                return Response({"error": response.status_code}, status=response.status_code)
+
+        except Exception as e:
+            print("Error Occured:", e)
+            
+class StudentRelatedTeacherViewSet(BaseViewset, BasePaginator):
+
+    def students_related_teacher(self, request):
+        logged_in_user_id = request.user.id
+        name = request.GET.get("name", '')
+
+        try:
+            users = User.objects.get(id=logged_in_user_id, is_active=True)
+            users = users.english_reading_tutors.all().distinct() | \
+                    users.math_tutors.all().distinct() | \
+                    users.english_writing_tutors.all().distinct()
+            
+            users=users.order_by('-created_at')
+
+            if name and not name.strip():
+                return Response({"results":[]})
+
+            if name:
+
+                users = users.filter(Q(first_name__icontains=name) | Q(last_name__icontains=name) | Q(first_name__icontains=name.split()[0], last_name__icontains=name.split()[-1]))
+
+            paginator = CustomPageNumberPagination()
+            paginated_students = paginator.paginate_queryset(users, request)
+
+            serialized_students = UserMinimumSerializer(paginated_students, many=True).data
+
+            results = []
+            for student_data in serialized_students:
+                student_sessions = StudentSessionPlan.objects.filter(student_id=student_data["id"])
+                serialized_student_sessions = StudentSessionPlanSerializer(student_sessions, many=True).data
+                student_availability = StudentAvailability.objects.filter(student_id=student_data["id"]).exclude(target_test_date_1__isnull = True).first()
+                serialized_availability = StudentAvailabilitySerializer(student_availability).data if student_availability else {}
+
+                teacher_student_session_dates = {
+                    "student_details": student_data,
+                    "student_sessions": serialized_student_sessions,
+                    "availability_details": serialized_availability,
+                }
+                results.append(teacher_student_session_dates)
+            return paginator.get_paginated_response(results)
+
+        except Exception as e:
+            print(f"Error in students_related_teacher: {str(e)}")
+            return Response({"error": "An error occurred"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+class AppointmentAgendaViewSet(BaseViewset, BasePaginator):      
+
+    def get_appointment_molecule(self, request, student_id, tutor_id):
+            try:
+                total_number_of_classes= 0
+                per_day_molecule = 0
+                query_set_data = None
+
+                # tutor_subject_type = request.user.tutor_type
+                tutor_subject_type = User.objects.get(id=tutor_id).tutor_type 
+                print("tutor_subject_type===>",tutor_subject_type)
+                appointment_id = request.query_params.get('Appointment_Id', None)
+                print("Appointment id:&&&&&&",appointment_id)
+
+                if appointment_id:
+                    query_set_data = AppointmentMolecule.objects.filter(
+                        appointment_id=appointment_id,
+                        is_completed=True
+                    ).select_related('molecule')  
+
+                    molecules_list = [molecule.molecule for molecule in query_set_data]
+                    print("molecules_list===>",molecules_list)
+
+                    sorted_molecules = sorted(molecules_list, key=lambda x: int(re.search(r'\d+', x.title).group()) if re.search(r'\d+', x.title) else float('inf'))
+
+                    serializer = NewMoleculeSerializer(sorted_molecules, many=True)
+
+                    return Response({"results": serializer.data})
+                
+                else:
+                
+                    student_session_plans = StudentSessionPlan.objects.filter(student=student_id, is_active=True)
+                    print("student_session_plans===>",student_session_plans)
+                    
+                    for session_plan in student_session_plans:
+                        subject_name = session_plan.subject.name.lower()
+                        print("subject_name===>",subject_name)
+
+                        mega_domain_name = session_plan.mega_domain.name.lower() if session_plan.mega_domain else ""
+                        print("mega_domain_name===>",mega_domain_name)
+
+                        if subject_name == "english":
+                            if not (("reading" in mega_domain_name and tutor_subject_type == "english_reading") or
+                                    ("writing" in mega_domain_name and tutor_subject_type == "english_writing")):
+                                continue  
+
+                        elif subject_name == "math" and tutor_subject_type != "math":
+                            continue 
+            
+                        # if subject_name not in ["english", "math"] or subject_name != tutor_subject_type:
+                        #     continue
+
+                        total_number_of_molecule = MotherSessionMolecule.objects.filter(session_plan=session_plan.session_plan.id).count() 
+                        # print("total_number_of_molecule===>",total_number_of_molecule)
+
+                        category = session_plan.category.upper()
+                        
+                        # if tutor_subject_type == "english" and subject_name == "english":
+
+                        if subject_name == "english":
+                            print("===english===")
+                            if category == "R":
+                                
+                                total_number_of_classes = total_number_of_molecule/2 
+                                per_day_molecule = total_number_of_molecule/total_number_of_classes
+                            elif category == "S":
+                            
+                                total_number_of_classes = total_number_of_molecule/3 
+                                per_day_molecule = total_number_of_molecule/total_number_of_classes
+                            elif category == "T":
+                            
+                                total_number_of_classes = total_number_of_molecule/4 
+                                per_day_molecule = total_number_of_molecule/total_number_of_classes
+
+                        elif subject_name == "math":
+                            print("===math===")
+                            if category == "R":
+                                
+                                total_number_of_classes = total_number_of_molecule/2 
+                                per_day_molecule = total_number_of_molecule/total_number_of_classes
+                            elif category == "S":
+                                
+                                total_number_of_classes = total_number_of_molecule/3 
+                                per_day_molecule = total_number_of_molecule/total_number_of_classes
+                            elif category == "T":
+                            
+                                # number_of_molecule /= 4
+                                total_number_of_classes = total_number_of_molecule/4 # 9
+                                per_day_molecule = total_number_of_molecule/total_number_of_classes
+
+                        # Filtering out molecules already present in AppointmentMolecule
+                        existing_molecule_ids = AppointmentMolecule.objects.filter(appointment__student=student_id, is_completed=True).values_list('molecule_id', flat=True)
+                    
+                        query_set_data = MotherSessionMolecule.objects.filter(session_plan=session_plan.session_plan.id).exclude(molecule_id__in=existing_molecule_ids)
+
+                        print("query_set_data==>",query_set_data)
+
+                        molecules_list = list(query_set_data)
+
+                        sorted_molecules = sorted(molecules_list, key=lambda x: int(re.search(r'\d+', x.molecule.title).group()) if re.search(r'\d+', x.molecule.title) else float('inf'))
+
+                        final_molecules = sorted_molecules[:math.ceil(per_day_molecule)]
+
+                        serializer = MotherSessionMoleculeSerializer(final_molecules, many=True)
+
+                        
+                    
+                        return Response({"results": serializer.data})
+
+                    return Response({"results": query_set_data})
+
+            except Exception as stacktrace:
+                print("Error Occurred:", stacktrace)
+                return Response({"error": "An error occurred while processing the request"}, status=500)
+            
+    
+    def createAppointmentMolecules(self, request):
+        try:
+            molecules_data = request.data.get('molecules',[])
+            appointment_id = request.data.get('appointment_id')
+
+            appointment= get_object_or_404(Appointments,pk=appointment_id)
+
+            for molecule_id in molecules_data:
+                if not AppointmentMolecule.objects.filter(appointment=appointment, molecule_id=molecule_id).exists():
+                    AppointmentMolecule.objects.get_or_create(
+                        appointment=appointment,
+                        molecule_id=molecule_id,
+                        is_completed=False
+                    )
+            return Response({'message': 'Molecules Saved..!!'}, status=status.HTTP_200_OK)
+        except Exception as e:
+            print("Error Occurred:", e)
+            return Response({"error": "An error occurred while processing the request"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+    def update_appointment_molecules_and_feedback(self, request):
+        try:
+            molecules_data = request.data.get('molecules', [])
+            appointment_id = request.data.get('appointment_id')
+            feedback_data = request.data.get('feedback', {})  
+            feedback_questions = request.data.get('feedback_questions', [])
+
+            appointment = get_object_or_404(Appointments, pk=appointment_id)
+
+            user_type = request.user.role
+            commenter_type = 'tutor' if user_type == 'tutor' else 'user'
+           
+            if user_type == 'tutor':
+                for molecule_id in molecules_data:
+                    AppointmentMolecule.objects.update_or_create(
+                        appointment=appointment,
+                        molecule_id=molecule_id,
+                        defaults={'is_completed': True}
+                    )
+            elif user_type == 'user':
+
+                molecules_data_str = list(map(str, molecules_data))
+
+                appointment_molecules = AppointmentMolecule.objects.filter(appointment=appointment)
+
+                for molecule in appointment_molecules:
+
+                    if str(molecule.molecule_id) in molecules_data_str:
+                            molecule.is_completed = True
+                    else:
+                            molecule.is_completed = False
+                    molecule.save()
+
+            feedback = FeedBack.objects.create(
+                comment=feedback_data.get('comment'),
+                student_id=feedback_data.get('student_id'),
+                tutor_id=feedback_data.get('tutor_id'),
+                appointment=appointment,
+                commenter=commenter_type,
+            )
+            
+            for feedback_question in feedback_questions:
+                question_id = feedback_question.get('question_id')
+                rating = feedback_question.get('rating')
+                question = get_object_or_404(FeedbackQuestions, pk=question_id)
+                FeedbackQuestionRating.objects.create(
+                    feedback=feedback,
+                    question=question,
+                    rating=rating
+                )
+            
+            appointment.is_completed = True
+            if user_type == 'tutor':
+                print("enter in tutor side")
+                print("saving in tutor side")
+                western_time = pytz.timezone('Asia/Kolkata')
+                appointment.end_at = western_time.localize(datetime.now())
+
+
+            appointment.save()
+
+            return Response({'message': 'Feedback and molecules updated successfully.'}, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+                 
+
+    def get_other_covered_agenda(self, request, student_id):
+        try:
+            tutor_subject_type = request.user.tutor_type
+            print("tutor_subject_type-->",tutor_subject_type)
+
+            excluded_molecule_ids = AppointmentMolecule.objects.filter(
+                appointment__student=student_id,
+                # is_completed=False,
+            ).values_list('molecule_id', flat=True)
+
+            print('excluded_molecule_ids-->',excluded_molecule_ids)
+
+            student_session_plans = StudentSessionPlan.objects.filter(student=student_id)
+            # print("student_session_plans @@@@@@@====>>>",student_session_plans)
+
+            print('student_session_plans===>',student_session_plans)
+
+            eligible_molecules = []
+
+            for session_plan in student_session_plans:
+                subject_name = session_plan.subject.name.lower() if session_plan.subject else ""
+                mega_domain_name = session_plan.mega_domain.name.lower() if session_plan.mega_domain else ""
+                if subject_name == "english":
+                    print("english-->")
+
+                    if (("reading" in mega_domain_name and tutor_subject_type == "english_reading") or
+                        ("writing" in mega_domain_name and tutor_subject_type == "english_writing")):
+
+                        queryset = MotherSessionMolecule.objects.filter(
+                            session_plan=session_plan.session_plan.id
+                        ).exclude(molecule_id__in=excluded_molecule_ids)
+
+                        print("queryset english==>", queryset)
+                        
+                        molecules_list = list(queryset)
+                        
+                        sorted_molecules = sorted(
+                            molecules_list, 
+                            key=lambda x: (x.molecule.title[0], int(re.search(r'\d+', x.molecule.title).group()) if re.search(r'\d+', x.molecule.title) else 0)
+                        )
+                        
+                        molecules = molecules_list[:2]
+                        
+                        eligible_molecules.extend(molecules)
+
+                elif subject_name == "math" and tutor_subject_type == "math":
+                    print('math==>')
+
+                    queryset = MotherSessionMolecule.objects.filter(
+                        session_plan=session_plan.session_plan.id
+                    ).exclude(molecule_id__in=excluded_molecule_ids)
+
+                    print("queryset math--->",queryset)
+
+                    molecules_list = list(queryset)
+                    
+                    sorted_molecules = sorted(molecules_list, key=lambda x: (x.molecule.title[0], int(re.search(r'\d+', x.molecule.title).group()) if re.search(r'\d+', x.molecule.title) else 0))
+                    
+                    molecules = sorted_molecules[:2]
+                    
+                    eligible_molecules.extend(molecules)
+
+            serializer = MotherSessionMoleculeSerializer(eligible_molecules, many=True)
+            return Response({"results": serializer.data})
+
+        except Exception as e:
+            print("Error Occurred:", e)
+            return Response({"error": "An error occurred while processing the request"}, status=500)
+        
+class LastClassAgendaViewSet(BaseViewset, BasePaginator):  
+    
+        
+    def get_last_classes_agenda(self, request):
+        mega_domain = request.query_params.get('megadomain')
+        student_id = request.query_params.get('student_id')
+        
+        last_completed_appointment = Appointments.objects.filter(
+            student_id=student_id, 
+            mega_domain=mega_domain.lower(), 
+            is_completed=True
+        ).order_by('-start_at').first()
+        
+        if last_completed_appointment:
+            last_classes_agenda = AppointmentMolecule.objects.filter(
+                appointment=last_completed_appointment, 
+                is_completed=True
+            )
+            molecule=last_classes_agenda.values_list('molecule', flat=True)
+
+            molecule_topic_subtopic=MoleculeTopicSubtopic.objects.filter(molecule_id__in=molecule)
+
+            home_assignment_status =StudentAssignment.objects.filter(subtopic__in=molecule_topic_subtopic.values_list('subtopic', flat=True),student_id=student_id,type="HOME",is_completed=True).exists()
+
+            appointment_serializer = NewAppointmentSerializer(last_completed_appointment)
+            last_class_agenda_serializers = AppointmentMoleculeSerializers(last_classes_agenda, many=True)
+            
+          
+            appointment_data = appointment_serializer.data
+            appointment_data['molecules'] = last_class_agenda_serializers.data
+            appointment_data['home_assignments'] = home_assignment_status
+            
+            return Response({
+                    "sucess": True, 
+                    "status": "success",
+                    "message":"Last Class Detail",
+                    "results": [appointment_data],
+                })
+        else:
+            return Response({"results": []})
+
+class TeacherAppointmentViewSet(BaseViewset, BasePaginator):
+    def get_teachers_appointments(self, request):
+        host_id = request.user.id
+        now = timezone.now()
+        sort_order= request.query_params.get('sort_order', 'desc')
+        appointment_status= request.query_params.get('status')
+        appointments = Appointments.objects.filter(host_id=host_id)
+
+        search = request.query_params.get('search', None)
+        if search and not search.strip():
+                return Response({"results":[]})
+
+        if search:
+            appointments = appointments.filter(Q(student__first_name__icontains=search) | Q(student__last_name__icontains=search) | Q(student__first_name__icontains=search.split()[0], student__last_name__icontains=search.split()[-1])|Q(title=search))
+
+        if appointment_status == 'completed':
+            appointments = appointments.filter(Q(is_completed=True) | (Q(start_at__lt=now - timedelta(hours=1, minutes=30)) & Q(is_completed=False))).exclude(status__in=['CANCELLED', 'RESCHEDULED']).order_by("-start_at")
+
+        elif appointment_status == 'upcoming':
+            # upcoming_margin = now + timedelta(hours=1, minutes=30)
+            # appointments = appointments.filter(Q(is_completed=False) & Q(start_at__gt=now) & Q(start_at__gte=upcoming_margin))
+            appointments = appointments.filter(is_completed=False).exclude(status__in=['CANCELLED', 'RESCHEDULED'])
+
+    
+        if sort_order == 'asc':
+            appointments = appointments.filter(host_id=host_id).order_by('start_at')
+
+        else :
+            appointments = appointments.filter(host_id=host_id).order_by('-start_at')
+
+        appointments = appointments.annotate(student_count=Count('student'))
+        appointments = list(appointments)
+        serializer = AppointmentMinimumSerializer(appointments, many=True).data
+            
+        modified_appointments = []
+        appointment_resource_grouping_map = {}
+        groupedAppointId = set()
+        response_data=[]
+
+        for app in serializer:
+            if app['type'] == 'group_class':
+                if app['resource_id'] in appointment_resource_grouping_map:
+                    appointment_resource_grouping_map[app['resource_id']].append(app['student'])
+                    
+                else:
+                    appointment_resource_grouping_map[app['resource_id']] = [app['student']]
+                    groupedAppointId.add(app['id'])
+
+        paginator = CustomPageNumberPagination()
+        paginated_appointments = paginator.paginate_queryset(appointments, request)
+        
+        
+        for appointment in appointments:
+            appointment_filter = {'appointment_id': appointment.id}
+
+            has_molecules = AppointmentMolecule.objects.filter(
+                appointment__id=appointment.id,
+                **appointment_filter
+            ).exists()
+            
+            completed_assignments = AppointmentMolecule.objects.filter(
+                appointment__id=appointment.id,
+                **appointment_filter,
+            ).values_list('molecule_id', flat=True)
+            
+            related_subtopics = MoleculeTopicSubtopic.objects.filter(
+                molecule_id__in=completed_assignments
+            ).values_list('subtopic_id', flat=True)
+            
+            related_assignments = StudentAssignment.objects.filter(
+                subtopic_id__in=related_subtopics,
+                student_id=appointment.student_id,
+                type="CLASS",
+            )
+            total_assignments_count = related_assignments.count()
+
+            if total_assignments_count == 0:
+                class_assignment_completed = False
+            else:
+                completed_assignments_count = related_assignments.filter(is_completed=True).count()
+                class_assignment_completed = total_assignments_count == completed_assignments_count
+
+
+            appointment_data = AppointmentMinimumSerializer(appointment).data
+            appointment_data['class_assignment_complete'] = class_assignment_completed
+            appointment_data['has_molecules'] = has_molecules 
+
+            if appointment_data['type'] == 'group_class':
+                appointment_data['student_count'] = len(appointment_resource_grouping_map.get(appointment_data['resource_id'], []))
+
+
+            appointment_obj=AppointmentReport.objects.filter(appointment=appointment.id).first()
+            appointment_data['is_tutor_joined']=appointment_obj.is_tutor_joined if appointment_obj else False
+
+            modified_appointments.append(appointment_data)
+         
+        for app in modified_appointments:
+            if app['type'] == 'group_class' and app['id'] in groupedAppointId:
+                app['student'] = appointment_resource_grouping_map[app['resource_id']]
+                response_data.append(app)
+            elif app['type'] == 'group_class' :#add
+                print("group class", app['id'])#add
+            if app['type'] != 'group_class': 
+                response_data.append(app)
+        print("response_data====>",len(response_data))
+        paginator = CustomPageNumberPagination()
+        paginated_appointments = paginator.paginate_queryset(response_data, request)#add
+        print("response_data====>",len(paginated_appointments))
+        return paginator.get_paginated_response(paginated_appointments)
+    
+
+
+    def alphanumeric_sort(s):
+            parts = []
+            current_part = ''
+
+            for char in s:
+                if char.isdigit():
+                    current_part += char
+                else:
+                    if current_part:
+                        parts.append(int(current_part))
+                        current_part = ''
+                    parts.append(char)
+            
+            if current_part:
+                parts.append(int(current_part))
+
+            return parts
+
+class AppointmentAssignemntViewset(BaseViewset, BasePaginator):
+    
+    def get_student_class_assignment(self, request, student_id, appointment_id=None):  
+        
+        try:
+            appointment_filter = {}
+            if appointment_id:
+                appointment_filter['appointment_id'] = appointment_id
+
+            completed_molecules = AppointmentMolecule.objects.filter(
+            appointment__student_id=student_id,
+            **appointment_filter,
+            ).values_list('molecule_id', flat=True)
+
+            related_subtopics = MoleculeTopicSubtopic.objects.filter(
+            molecule_id__in=completed_molecules
+            ).values_list('subtopic_id', flat=True)
+
+            related_assignments = StudentAssignment.objects.filter(
+            subtopic_id__in=related_subtopics,
+            student_id=student_id,
+            type="CLASS",
+            )
+
+            related_assignments = related_assignments.annotate(
+                        assignment_length=Length('name')
+                    ).order_by('assignment_length', 'name')
+        
+            total_assignments_count = related_assignments.count()
+            
+            if total_assignments_count == 0:
+                class_assignment_completed = False
+            else:
+                completed_assignments_count = related_assignments.filter(is_completed=True).count()
+                class_assignment_completed = total_assignments_count == completed_assignments_count
+            serializer = StudentAssignmentSerializer(related_assignments, many=True)
+
+            response_data = {
+            'assignments': serializer.data,
+            'class_assignment_completed': class_assignment_completed
+            }
+
+            return Response(response_data)
+        
+        except Exception as e:
+            print("Exception ====> ", e)
+            return Response(
+                {"success": False, "error": "Something went wrong"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+
+    def get_student_home_assignment(self, request, student_id, appointment_id=None):
+        try:
+            appointment_filter = {}
+
+            if appointment_id:
+                appointment_filter['appointment_id'] = appointment_id
+
+            completed_molecules = AppointmentMolecule.objects.filter(
+                appointment__student_id=student_id,
+                is_completed=True,
+                **appointment_filter,
+            ).values_list('molecule_id', flat=True)
+
+            related_subtopics = MoleculeTopicSubtopic.objects.filter(
+                molecule_id__in=completed_molecules
+            ).values_list('subtopic_id', flat=True)
+
+
+            related_assignments = StudentAssignment.objects.filter(
+                subtopic_id__in=related_subtopics,
+                student_id=student_id,
+                type="HOME",
+                is_active = True,
+            ).select_related('subject').prefetch_related(
+                'student_assignment_questions__student_question_options'
+            )
+            
+            related_assignments = related_assignments.annotate(
+                        assignment_length=Length('name')
+                    ).order_by('assignment_length', 'name')  
+            
+
+            total_assignments_count = related_assignments.count()
+            
+            if total_assignments_count == 0:
+                home_assignment_completed = False
+            else:
+                completed_assignments_count = related_assignments.filter(is_completed=True).count()
+                home_assignment_completed = total_assignments_count == completed_assignments_count
+
+            serializer = StudentHomeAssignmentSerializer(related_assignments, many=True)
+
+            response_data = {
+                'assignments': serializer.data,
+                'home_assignment_completed': home_assignment_completed
+            }
+
+            return Response(response_data)
+
+        except Exception as e:
+            print("Exception ====> ", e)
+            return Response(
+                {"success": False, "error": "Something went wrong"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+
+    def get_student_assignment_question(self, request, student_assignment_id):
+        try:
+            student_assignment = StudentAssignment.objects.get(pk=student_assignment_id)
+
+            student_assignment_serialized = StudentAssignmentSerializer(student_assignment).data
+
+            questions = StudentAssignmentQuestion.objects.filter(student_assignment=student_assignment).prefetch_related('student_question_options')
+            questions_serialized = StudentAssignmentQuestionSerializer(questions, many=True).data
+
+            for question in questions_serialized:
+                question.pop('student_assignment', None)
+
+            response_data = {
+                "student_assignment": student_assignment_serialized,
+                "questions": questions_serialized
+            }
+
+            return Response(response_data)
+        except StudentAssignment.DoesNotExist:
+            return Response({'error': 'StudentAssignment not found'}, status=404)
+        
+    def update_student_assignment_question(self, request):
+        questions = request.data.get('questions', [])
+        is_submit_clicked = request.data.get('is_submit_clicked', False)
+        student_assignment_ids = set()  
+
+        for question in questions:
+            student_assignment_id = question.get('student_assignment_id')
+            if student_assignment_id is not None:
+                student_assignment_ids.add(student_assignment_id)  
+            
+            options = question.get('student_question_options', [])
+            for option in options:
+                option_id = option.get('id')
+                is_correct = option.get('is_correct', False)
+                
+                try:
+                    question_option = StudentQuestionOption.objects.get(
+                        id=option_id, 
+                        student_assignment_question__id=question.get('id')  
+                    )
+                    
+                    question_option.is_correct = is_correct
+                    question_option.save()
+                except StudentQuestionOption.DoesNotExist:
+                    continue
+        
+        messages = []
    
+        for student_assignment_id in student_assignment_ids:
+            try:
+                student_assignment = StudentAssignment.objects.get(pk=student_assignment_id)
+   
+                if is_submit_clicked:
+                    student_assignment.is_completed = True
+                    student_assignment.save()
+                    messages.append(f"Assignment {student_assignment_id} marked as completed successfully.")
+                else:
+                    pass
+            except StudentAssignment.DoesNotExist:
+                messages.append(f"StudentAssignment {student_assignment_id} not found.")
+
+        if not messages:
+            messages.append("No updates were made.")
+        
+        return Response({"messages": messages}, status=status.HTTP_200_OK)
+        
+    
+    def correct_answer_for_questions(self, request, student_id):
+        question_ids = request.data.get('question_ids', [])
+        results = []
+
+        student_answers_qs = StudentQuestionOption.objects.filter(
+            student_assignment_question__assignment_question__in=question_ids,
+            student__id=student_id
+        ).select_related('question_option', 'student_assignment_question')
+
+        for question_id in question_ids:
+            correct_options_qs = QuestionOption.objects.filter(
+                questions_id=question_id, 
+                is_correct=True
+            ).prefetch_related('questions')
+
+            correct_options_serializer = QuestionOptionSerializer(correct_options_qs, many=True)
+
+            # Filter student_answers for the current question
+            filtered_student_answers = [
+                ans for ans in student_answers_qs
+                if ans.student_assignment_question.assignment_question_id == question_id
+            ]
+
+            validation = [{
+                "student_option_id": answer.id,
+                "selected_option_id": answer.question_option.id if answer.question_option else None,
+                "is_correct": answer.is_correct
+            } for answer in filtered_student_answers]
+
+            results.append({
+                "question_id": question_id,
+                "correct_options": correct_options_serializer.data,
+                "student_selection": validation
+            })
+
+        return Response(results)
+    
+#----------------------------------------------------------------
+
+class CompletedClassViewSet(BaseViewset, BasePaginator):
+
     def get_completed_classes(self, request, student_id):
         sort_order = self.request.query_params.get('order',None)
         subject_query = request.query_params.get('search', None)
@@ -1724,12 +1719,10 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                         is_completed=True  
                     ).exists()
 
-
                     appointment.home_assignment_present = has_home_assignments  #_Transient_field
                     appointment.home_assignment_completed = home_assignment_completed
 
                     valid_appointments.append(appointment)
-
 
         if sort_order == 'desc':
             appointments = Appointments.objects.filter(is_completed=True, student_id=student_id).order_by('-created_at')
@@ -1742,7 +1735,8 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
         serializer = AppointmentSerializer(paginated_appointment, many=True, context={'request': request})
         return Response(serializer.data)
         
-    
+class LastClassViewSet(BaseViewset, BasePaginator):
+
     def get_last_classes(self, request, student_id):
         last_class = Appointments.objects.filter(
             student_id=student_id,
@@ -1761,190 +1755,100 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
 
  #----------------------------------------------------------------
 
-    def get_dayScheduler_booking(self, request, booking_id):
-        print("enter")
-        get_all_users_url = f"https://api.dayschedule.com/v1/bookings/{booking_id}"
-        # print("get_all_users_url==>",get_all_users_url)
+# def generate_zoom_link(request):
+#     get_zoom_link = "https://zoom.us/oauth/token"
+#     client_id = os.environ.get("ZOOM_CLIENT_ID")
+#     client_secret = os.environ.get("ZOOM_CLIENT_SECRET")
+#     refresh_token = os.environ.get("ZOOM_REFRESH_TOKEN")
+#     cleint_credentials = f"{client_id}:{client_secret}"
+#     client_credentials_b64 = base64.b64encode(cleint_credentials.encode()).decode()
+#     headers = {
+#         "Authorization": f"Basic {client_credentials_b64}",
+#         "Content-Type": "application/x-www-form-urlencoded",
+#     }
+#     data = {"grant_type": "refresh_token", "refresh_token": refresh_token}
+#     response_token = requests.post(get_zoom_link, headers=headers, data=data)
 
-        headers = {
-            "Content-Type": "application/json",   
-        }
+#     if response_token.json():
+#         create_meeting_url = "https://api.zoom.us/v2/users/me/meetings"
+#         meeting_data = {
+#             "topic": request.data["title"],
+#             "type": 2,
+#             "start_time": request.data["start_time"],
+#             "duration": request.data["duration"],
+#             "settings": {
+#                 "host_video": True,
+#                 "participant_video": True,
+#                 "join_before_host": True,
+#                 "mute_upon_entry": True,
+#                 "watermark": True,
+#                 "audio": "voip",
+#                 "auto_recording": "cloud",
+#             },
+#         }
 
-        params ={
-            "apiKey": "AOthHfwumTELV7qUslLHRNxeOpObRhvp"
-        }
+#         # Define headers with the access token
+#         headers = {
+#             "Authorization": f"Bearer {response_token.json()['access_token']}",
+#             "Content-Type": "application/json",
+#         }
 
-        try: 
-            response = requests.get(get_all_users_url, headers=headers, params=params)
-            if response.status_code == 200:
-                users_list = response.json()
-                return Response({"users_list": users_list})
-                
-            else :
-                return Response({"error": "Failed to retrieve booking info, status code: {}".format(response.status_code)}, status=response.status_code)
+#         try:
+#             response = requests.post(create_meeting_url, headers=headers, json=meeting_data)
 
-        except Exception as e:
-            print("Error Occured:", e)
-            return Response({"error": "An error occurred while retrieving booking information."}, status=500)
+#             if response.status_code == 201:
+#                 meeting_details = response.json()
+#                 return {"data": meeting_details}
 
+#             else:
+#                 return {"error": response.status_code}
 
- #----------------------------------------------------------------
-    #Get api for admin to see all users by create suresh
-    def get_all_users(self, request):
-        get_appointments_url = f"https://api.dayschedule.com/v1/bookings"
-        # print("Get Appointments",{id:pk})
+#         except Exception as e:
+#             print(f"An error occurred: {str(e)}")
+#             return {"error": f"An error occurred: {str(e)}"}
 
-        headers = {
-            "Content-Type":"application/json",
-        }
-
-        params = {
-            "apiKey": "AOthHfwumTELV7qUslLHRNxeOpObRhvp"
-        }
-
-        try:
-            response = requests.get(get_appointments_url, headers=headers, params=params)
-            
-            if response.status_code == 200:
-                page_list = response.json().get("result",[])
-                print(f"Page List: {page_list}")
-                return Response({"page_list": page_list})
-            
-            else :
-                return Response({"error": response.status_code}, status=response.status_code)
-
-        except Exception as e:
-            print("Error Occured:", e)     
-
-   
-
-    def get_appointments(self, request,tutor_id):
-        get_appointments_url = f"https://api.dayschedule.com/v1/pages/"
-        # print("Get Appointments",{id:pk})
-
-        headers = {
-            "Content-Type":"application/json",
-        }
-
-        params = {
-            "id":tutor_id,
-            "apiKey": "AOthHfwumTELV7qUslLHRNxeOpObRhvp"
-        }
-
-        try:
-            print(f"Request URL:======> {get_appointments_url}")
-            print(f"Request Parameters: {params}")
-            response = requests.get(get_appointments_url, headers=headers, params=params)
-            
-            if response.status_code == 200:
-                page_list = response.json().get("result",[])
-                print(f"Page List: {page_list}")
-                return Response({"page_list": page_list})
-            
-            else :
-                return Response({"error": response.status_code}, status=response.status_code)
-
-        except Exception as e:
-            print("Error Occured:", e)
-    
-#----------------------------------------------------------------
-def generate_zoom_link(request):
-    get_zoom_link = "https://zoom.us/oauth/token"
-    client_id = os.environ.get("ZOOM_CLIENT_ID")
-    client_secret = os.environ.get("ZOOM_CLIENT_SECRET")
-    refresh_token = os.environ.get("ZOOM_REFRESH_TOKEN")
-    cleint_credentials = f"{client_id}:{client_secret}"
-    client_credentials_b64 = base64.b64encode(cleint_credentials.encode()).decode()
-    headers = {
-        "Authorization": f"Basic {client_credentials_b64}",
-        "Content-Type": "application/x-www-form-urlencoded",
-    }
-    data = {"grant_type": "refresh_token", "refresh_token": refresh_token}
-    response_token = requests.post(get_zoom_link, headers=headers, data=data)
-
-    if response_token.json():
-        create_meeting_url = "https://api.zoom.us/v2/users/me/meetings"
-        meeting_data = {
-            "topic": request.data["title"],
-            "type": 2,
-            "start_time": request.data["start_time"],
-            "duration": request.data["duration"],
-            "settings": {
-                "host_video": True,
-                "participant_video": True,
-                "join_before_host": True,
-                "mute_upon_entry": True,
-                "watermark": True,
-                "audio": "voip",
-                "auto_recording": "cloud",
-            },
-        }
-
-        # Define headers with the access token
-        headers = {
-            "Authorization": f"Bearer {response_token.json()['access_token']}",
-            "Content-Type": "application/json",
-        }
-
-        try:
-            response = requests.post(create_meeting_url, headers=headers, json=meeting_data)
-
-            if response.status_code == 201:
-                meeting_details = response.json()
-                return {"data": meeting_details}
-
-            else:
-                return {"error": response.status_code}
-
-        except Exception as e:
-            print(f"An error occurred: {str(e)}")
-            return {"error": f"An error occurred: {str(e)}"}
-
-    else:
-        return {"error": "Access token Generation Error..!!"}
+#     else:
+#         return {"error": "Access token Generation Error..!!"}
 
 
-def generate_calendar_token(join_link, request, userhost):
-    client_id = os.environ.get("GMAIL_CLIENT_ID")
-    client_secret = os.environ.get("GMAIL_CLIENT_SECRET")
-    grant_type = "refresh_token"
-    refresh_token = os.environ.get("GMAIL_REFRESH_TOKEN")
-    api = f"https://oauth2.googleapis.com/token?client_id={client_id}&client_secret={client_secret}&grant_type={grant_type}&refresh_token={refresh_token}"
-    headers = {"Authorization": f"Bearer {refresh_token}", "Content-Type": "application/x-www-form-urlencoded"}
-    response_token = requests.post(api, headers=headers)
-    # print('response_token ==>>> ', response_token)
-    if response_token.json():
-        # print('userhost.email ==>> ', userhost.email)
-        calendar_api = (
-            "https://www.googleapis.com/calendar/v3/calendars/zuperscore.india@gmail.com/events?sendNotifications=true"
-        )
+# def generate_calendar_token(join_link, request, userhost):
+#     client_id = os.environ.get("GMAIL_CLIENT_ID")
+#     client_secret = os.environ.get("GMAIL_CLIENT_SECRET")
+#     grant_type = "refresh_token"
+#     refresh_token = os.environ.get("GMAIL_REFRESH_TOKEN")
+#     api = f"https://oauth2.googleapis.com/token?client_id={client_id}&client_secret={client_secret}&grant_type={grant_type}&refresh_token={refresh_token}"
+#     headers = {"Authorization": f"Bearer {refresh_token}", "Content-Type": "application/x-www-form-urlencoded"}
+#     response_token = requests.post(api, headers=headers)
+#     # print('response_token ==>>> ', response_token)
+#     if response_token.json():
+#         # print('userhost.email ==>> ', userhost.email)
+#         calendar_api = (
+#             "https://www.googleapis.com/calendar/v3/calendars/zuperscore.india@gmail.com/events?sendNotifications=true"
+#         )
 
-        headers = {
-            "Authorization": f"Bearer {response_token.json()['access_token']}",
-            "Content-Type": "application/x-www-form-urlencoded",
-        }
+#         headers = {
+#             "Authorization": f"Bearer {response_token.json()['access_token']}",
+#             "Content-Type": "application/x-www-form-urlencoded",
+#         }
 
-        # print('start_time ==>> ', request.data["start_time"])
-        # print('end_time ==>> ', request.data["end_time"])
-        # print('request.user.email ==>> ', request.user.email)
-        zoom_dummy = {
-            "summary": request.data["title"],
-            "start": {"dateTime": request.data["start_time"], "timeZone": "UTC"},
-            "end": {"dateTime": request.data["end_time"], "timeZone": "UTC"},
-            "description": f"Zoom Meeting Link:{join_link}",
-            "attendees": [{"email": request.user.email}],
-        }
+#         # print('start_time ==>> ', request.data["start_time"])
+#         # print('end_time ==>> ', request.data["end_time"])
+#         # print('request.user.email ==>> ', request.user.email)
+#         zoom_dummy = {
+#             "summary": request.data["title"],
+#             "start": {"dateTime": request.data["start_time"], "timeZone": "UTC"},
+#             "end": {"dateTime": request.data["end_time"], "timeZone": "UTC"},
+#             "description": f"Zoom Meeting Link:{join_link}",
+#             "attendees": [{"email": request.user.email}],
+#         }
 
-        response_calendar_schedule = requests.post(calendar_api, headers=headers, json=zoom_dummy)
-        # print('response_calendar_schedule.json() ==>>> ', response_calendar_schedule.json())
-        if response_calendar_schedule.json():
-            return {"data": response_calendar_schedule.json()}
-        else:
-            return {"error": "Error in Meeting Scheduling..!!"}
+#         response_calendar_schedule = requests.post(calendar_api, headers=headers, json=zoom_dummy)
+#         # print('response_calendar_schedule.json() ==>>> ', response_calendar_schedule.json())
+#         if response_calendar_schedule.json():
+#             return {"data": response_calendar_schedule.json()}
+#         else:
+#             return {"error": "Error in Meeting Scheduling..!!"}
         
-
-        
-
 class StudentAvailabilityViewSet(BaseViewset):
 
     serializer_class = StudentAvailabilitySerializer
@@ -2129,7 +2033,8 @@ class StudentAvailabilityViewSet(BaseViewset):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         
-    
+class CalculateStudentAvailabilityViewSet(BaseViewset):
+
     def calculate_availability(self, request, student_id):
         try:
             student_availabilities = StudentAvailability.objects.filter(student=student_id)
@@ -2190,17 +2095,11 @@ class StudentAvailabilityViewSet(BaseViewset):
                           total_accelerator_days+=student_availability.total_days
 
             # Convert to weeks
-            print("total blackout days=======",total_blackout_days)
-            print("total accelerator days======",total_accelerator_days)
             total_blackout_weeks = total_blackout_days / 7
             total_accelerator_weeks = total_accelerator_days / 7 
-            print("yo(^_^)=========")
             number_of_weeks = abs((core_prep_date - join_date).days) / 7
-            print("##########====>>",number_of_weeks)
 
             disposable_time = math.ceil(number_of_weeks) - math.ceil(total_blackout_weeks) + 0.5 * math.ceil(total_accelerator_weeks)
-            print("@@@@@@@@@@@@@@@@==========>>>",disposable_time)
-
             student_session_plans = StudentSessionPlan.objects.filter(student=student_id)
             
             if not student_session_plans.exists(): 
@@ -2220,16 +2119,13 @@ class StudentAvailabilityViewSet(BaseViewset):
 
             for session_plan in student_session_plans:
                 subject_name = session_plan.subject.name
-                print("subject@@@@@@@@@",subject_name)
 
                 if subject_name:
                     number_of_molecule = MotherSessionMolecule.objects.filter(session_plan=session_plan.session_plan.id).count()
-                    print("NO_=========>",number_of_molecule)
                     if subject_name.lower() == "english": 
                         e_category = session_plan.category
                         if e_category.upper() == "R":
                             english_number_of_molecules += number_of_molecule / 2
-                            print("english_number_of_molecules=====>>>",english_number_of_molecules)
                         elif e_category.upper() == "S":
                             english_number_of_molecules += number_of_molecule / 3
                         elif e_category.upper() == "T":
@@ -2248,7 +2144,6 @@ class StudentAvailabilityViewSet(BaseViewset):
             temp_dict['math_number_of_molecules'] = temp_dict.get('math_number_of_molecules', 0) + math_number_of_molecules
 
             total_session = temp_dict['english_number_of_molecules'] + temp_dict['math_number_of_molecules']
-            print("total sessions @@@@@@@@@====>>>",total_session)
 
             No_of_Session_per_Week = abs(math.ceil(total_session / disposable_time))
             temp_dict['total_classes'] = No_of_Session_per_Week
@@ -2270,6 +2165,7 @@ class StudentAvailabilityViewSet(BaseViewset):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
        
+class AssignCategoryViewSet(BaseViewset):
 
     def assign_category(self, request, student_id):
         print("enter in code")
@@ -2312,7 +2208,7 @@ class StudentAvailabilityViewSet(BaseViewset):
             )
 
 
-
+class UsersTeamViewSet(BaseViewset):
 
     def user_list(self, request):
         try:
@@ -2331,8 +2227,8 @@ class StudentAvailabilityViewSet(BaseViewset):
                 users = User.objects.filter(role="prep_manager")
             elif type == "sso_manager":
                 users = User.objects.filter(role="sso_manager")
-            elif type == "ops_manager":
-                users = User.objects.filter(role="ops_manager")
+            elif type == "manager":
+                users = User.objects.filter(role="manager")
             
             serializer = UserMinimumSerializer(users, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -2499,17 +2395,13 @@ class TutorDashBoradViewSet(BaseViewset):
         })
 
 
-class TeacherAppointmentFeedbackViewSet(BaseViewset):
-
-    
+class TeacherAppointmentFeedbackViewSet(BaseViewset):    
     def list(self, request, appointment_id):
         try:
             tutor_id = request.query_params.get('tutor_id')
             student_id = request.query_params.get('student_id')
 
-            feedback_type = 'tutor' if tutor_id else 'student'
-            # commenter_type = 'tutor' if tutor_id else 'user'
-            
+            feedback_type = 'tutor' if tutor_id else 'student'            
             response_data = {
                 "appointment_molecule": [],
                 "feedback": []
@@ -2528,13 +2420,8 @@ class TeacherAppointmentFeedbackViewSet(BaseViewset):
 
             if student_id:
                 feedback_filter &= Q(student_id=student_id) & (Q(commenter='tutor') | Q(commenter='user'))
-                print("feedback_filter===>",feedback_filter)
-
-            # feedback_entries = FeedBack.objects.filter(feedback_filter, commenter=commenter_type).order_by("-created_at")
                 
             feedback_entries = FeedBack.objects.filter(feedback_filter).order_by("-created_at")
-
-            print("feedback_entries===>",feedback_entries)
 
             if feedback_entries:
                 for fb in feedback_entries:
@@ -2668,7 +2555,6 @@ class StudentDashBoardViewSet(BaseViewset):
                 sessions_assigned['math'] = True
                 session_completed['math'] = not related_assignments.exists() or is_completed
 
-            # If all related assignments are completed or manually marked as completed, mark the session plan as completed
             if not related_assignments.exists() or is_completed:
                 session_plan.is_completed = True
                 session_plan.save()
@@ -2686,7 +2572,7 @@ class StudentDashBoardViewSet(BaseViewset):
         for session_plan in student_session_plans:
             subject_name = session_plan.subject.name.lower()
             category = session_plan.category.upper()
-            number_of_molecule = MotherSessionMolecule.objects.filter(session_plan=session_plan.id).count()
+            number_of_molecule = MotherSessionMolecule.objects.filter(session_plan=session_plan.session_plan_id).count()
             if subject_name == "english":
                 if category == "R":
                     english_number_of_molecules_list.append(number_of_molecule / 2)
@@ -2968,6 +2854,7 @@ class GroupClassesBaseViewSet(BaseViewset):
             print("Error Occurred:", e)
             return Response({"error": "Internal Server Error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+class AssignGroupClassesBaseViewSet(BaseViewset):
 
     def assign_group_classes(self, request, deptHead_id):
         try:
@@ -2975,10 +2862,8 @@ class GroupClassesBaseViewSet(BaseViewset):
         except User.DoesNotExist:
             return Response({'error': 'Department Head not found.'}, status=404)
         
-        # sso= request.data.get('sso',None)
         sso = User.objects.get(id=request.data.get('sso'))  
     
-        # print("sso_id:", sso)
         target_test_date = request.data.get('targetDt',None)
 
         if not sso:
@@ -3046,9 +2931,11 @@ class GroupClassesBaseViewSet(BaseViewset):
             "results": serializer.data,
         })
     
+
+class StudentGroupEventBaseViewSet(BaseViewset):
+
     def get_student_group_events(self,request):
         logged_in_user_sso = request.user
-        # today = date.today()
         search = request.GET.get('search', None)
         events_query = StudentGroupEvents.objects.filter(sso=logged_in_user_sso)
         if search:
@@ -3065,16 +2952,15 @@ class GroupClassesBaseViewSet(BaseViewset):
             .order_by('-max_id')
         )
 
-        paginator = CustomPageNumberPagination()#add
-        paginated_students = paginator.paginate_queryset(grouped_events, request)#add
+        paginator = CustomPageNumberPagination()
+        paginated_students = paginator.paginate_queryset(grouped_events, request)
         response_data = {'events_list': []}
         for group_event in paginated_students:
             events = (
                 StudentGroupEvents.objects
                 .filter(group_id=group_event['group_id'], sso=logged_in_user_sso)
                 .values('event_id', 'class_name', 'tutor_name', 'subject', 'is_taken',
-                        'is_sso_verified', 'target_test_date', 'group_id')
-                        
+                        'is_sso_verified', 'target_test_date', 'group_id')       
             )
             
             group_info = {
@@ -3093,20 +2979,16 @@ class GroupClassesBaseViewSet(BaseViewset):
 
         response_data=paginator.get_paginated_response(response_data)#add
         return Response(
-                # "success": True,
-                # "status": "success",
-                # "message": "Events List..!",
                 response_data.data
             )
 
+class AllotGroupClassBaseViewSet(BaseViewset):
 
     def allot_group_classes(self, request):
         try:
             subject = request.query_params.get('subject')
             group_id = request.query_params.get('group_id')
-            print("Subject==>",subject)
             student_ids = request.data.get('student_ids',[])
-            print("student_ids==>",student_ids)
 
             for student_id in student_ids:
                 StudentGroupEvents.objects.filter(student_id=student_id, is_sso_verified= False, subject=subject, group_id=group_id).update(is_sso_verified=True)
@@ -3121,7 +3003,8 @@ class GroupClassesBaseViewSet(BaseViewset):
             print("Exception==========>",e)
             return Response({"message": "Something went wrong"})
         
-        
+class CheckStudentGroupBaseViewSet(BaseViewset):
+
     def check_student_group_assignment(self, request, student_id):
         try:
             subjects = ["English_Reading", "English_Writing", "Math"]
@@ -3146,7 +3029,8 @@ class GroupClassesBaseViewSet(BaseViewset):
                 "results": {subject: False for subject in subjects}
             })
         
-    
+class SsoStudentBaseViewSet(BaseViewset):
+
     def get_sso_students_by_group_id(self, request, group_id):
         try:
             student_events = StudentGroupEvents.objects.filter(group_id=group_id).order_by('-created_at')
@@ -3415,9 +3299,6 @@ class UnattendedClassesViewSet(BaseViewset):  #added after merging
 
         if student_id:
             current_time = datetime.now()
-            # completed_classes = Appointments.objects.filter(is_completed=True,student_id=student_id,type__in=['cpea', 'coreprep', 'group_class']).exclude(appointment_reports__is_student_joined=False).count()
-            # scheduled_classes = Appointments.objects.filter(start_at__gt=current_time, is_completed=False,student_id=student_id,type__in=['cpea', 'coreprep', 'group_class']).exclude(appointment_reports__is_student_joined=False).count()
-
             completed_classes = Appointments.objects.filter(
                                 is_completed=True,
                                 student_id=student_id,
