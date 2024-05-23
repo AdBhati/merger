@@ -2878,6 +2878,22 @@ class ReadingCpeaBaseViewSet(BaseViewset):
             })
         except Exception as e:
             return Response(str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+    def get_by_id(self, request, student_id):
+        try:
+            reports = StudentReadingCpeaReport.objects.filter(student_id=student_id)
+            serializer = StudentReadingCpeaReportSerializer(reports, many=True)
+            return Response({
+            "success": True,
+            "status": "success",
+            "message": "CPEA Reading Report",
+            "results": serializer.data,
+            })
+        except StudentReadingCpeaReport.DoesNotExist:
+            return Response({"error": "Student reports not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response(str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
      
 
     
@@ -3365,7 +3381,7 @@ class UnattendedClassesViewSet(BaseViewset):  #added after merging
         else:
             return Response({"error": "You do not have permission to cancel the class"}, status=status.HTTP_403_FORBIDDEN)
         
-
+class UnattendedCounterClassesViewSet(BaseViewset):
         
     def counters_of_all_classes(self, request):    
         student_id = request.query_params.get('student_id','None')
