@@ -598,7 +598,7 @@ urlpatterns = [
     path('conduct/student-cpea-report/<int:student_id>/',CpeaBaseViewSet.as_view({"get":"get_student_cpea_report"})),
     path('conduct/student-cpea-report/<int:student_id>/<int:appointment_id>',CpeaBaseViewSet.as_view({"put":"update_student_cpea_report"})),
     path('conduct/reading-student-cpea-report/',ReadingCpeaBaseViewSet.as_view({"post":"create_reading_cpea_report"})),
-    path('conduct/reading-student-cpea-report/<int:student_id>',ReadingCpeaBaseViewSet.as_view({"get":"get_by_id"})),
+    # path('conduct/reading-student-cpea-report/<int:student_id>',ReadingCpeaBaseViewSet.as_view({"get":"get_by_id"})),
 
 
 

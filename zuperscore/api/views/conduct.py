@@ -718,11 +718,12 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
 
                 # Check for time overlap with a conservative duration estimate.
                 for appointment in same_day_appointments:
-                    appointment_start = appointment.start_at
-                    appointment_end = appointment_start + timedelta(minutes=int(appointment.duration) if appointment.duration else MAX_DURATION_MINUTES)
+                    if appointment.is_active == True:
+                        appointment_start = appointment.start_at
+                        appointment_end = appointment_start + timedelta(minutes=int(appointment.duration) if appointment.duration else MAX_DURATION_MINUTES)
 
-                    if (new_start_datetime < appointment_end and estimated_end_time > appointment_start):
-                        return Response({"error": "The new appointment overlaps with an existing one."}, status=status.HTTP_400_BAD_REQUEST)
+                        if (new_start_datetime < appointment_end and estimated_end_time > appointment_start):
+                            return Response({"error": "The new appointment overlaps with an existing one."}, status=status.HTTP_400_BAD_REQUEST)
                     
                 if appointment_type == 'group_class':
                     existing_group_classes = Appointments.objects.filter(student=student, type='group_class',start_at__date=appointment_date,mega_domain=mega_domain,)
@@ -816,7 +817,7 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
            
             booking_ids = [item.get("booking") for item in data]
             day_scheduler_responses = []
-            expired_appointments = []
+            # expired_appointments = []
 
             for booking_id in booking_ids:
                 day_scheduler_response = self.get_dayScheduler_booking(request, booking_id)
@@ -834,34 +835,34 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                     appointment.title = subject
                     appointment.save()
                 
-                duration_minutes = int(appointment.duration)  
-                class_end_time = appointment.start_at + timedelta(minutes=duration_minutes)
-                current_time = datetime.now(timezone.utc)
+                # duration_minutes = int(appointment.duration)  
+                # class_end_time = appointment.start_at + timedelta(minutes=duration_minutes)
+                # current_time = datetime.now(timezone.utc)
 
-                if current_time > class_end_time:
+                # if current_time > class_end_time:
                     
-                    appointment_report = AppointmentReport.objects.filter(appointment_id=appointment_id).first()
-                    if appointment_report:
-                        is_student_joined = appointment_report.is_student_joined
-                        is_tutor_joined = appointment_report.is_tutor_joined
+                #     appointment_report = AppointmentReport.objects.filter(appointment_id=appointment_id).first()
+                #     if appointment_report:
+                #         is_student_joined = appointment_report.is_student_joined
+                #         is_tutor_joined = appointment_report.is_tutor_joined
 
-                        if not is_student_joined and not is_tutor_joined:
-                            status = 'unattended'
-                            reason = 'BOTH_TUTOR_AND_STUDENT_NOT_JOIN'
-                        elif is_student_joined and not is_tutor_joined:
-                            status = None
-                            reason = 'TUTOR_NOT_JOINED'
-                        elif not is_student_joined and is_tutor_joined:
-                            status = None
-                            reason = 'STUDENT_NOT_JOINED'
-                        else:
-                            status = 'attended'
-                            reason = 'BOTH_TUTOR_AND_STUDENT_JOIN'
+                #         if not is_student_joined and not is_tutor_joined:
+                #             status = 'unattended'
+                #             reason = 'BOTH_TUTOR_AND_STUDENT_NOT_JOIN'
+                #         elif is_student_joined and not is_tutor_joined:
+                #             status = None
+                #             reason = 'TUTOR_NOT_JOINED'
+                #         elif not is_student_joined and is_tutor_joined:
+                #             status = None
+                #             reason = 'STUDENT_NOT_JOINED'
+                #         else:
+                #             status = 'attended'
+                #             reason = 'BOTH_TUTOR_AND_STUDENT_JOIN'
 
-                        appointment_report.status = status
-                        appointment_report.reason = reason
-                        appointment_report.save()
-                        expired_appointments.append(appointment_data)
+                #         appointment_report.status = status
+                #         appointment_report.reason = reason
+                #         appointment_report.save()
+                #         expired_appointments.append(appointment_data)
 
                 taught_molecules = AppointmentMolecule.objects.filter(appointment__id=appointment_id, is_completed=True).values_list('molecule_id', flat=True)
                 related_subtopics = MoleculeTopicSubtopic.objects.filter(molecule_id__in=taught_molecules).values_list('subtopic_id', flat=True)
@@ -904,8 +905,8 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 appointment_data['home_assignment_present'] = home_assignment_present
                 appointment_data['has_molecules'] = has_molecules
 
-            for expired_appointment in expired_appointments:
-                data.remove(expired_appointment)
+            # for expired_appointment in expired_appointments:
+            #     data.remove(expired_appointment)
 
             return Response({
                 "bookings": data,
@@ -2803,19 +2804,34 @@ class CpeaBaseViewSet(BaseViewset):
     
     
     def get_student_cpea_report(self, request, student_id):
-            appointment_id = request.query_params.get("appointment_id")
-            if appointment_id:
-                student_cpea_report = StudentCpeaReport.objects.filter(student=student_id, appointment=appointment_id)
+
+        report_type = request.GET.get('report_type')
+        appointment_id = request.query_params.get("appointment_id")
+        
+        if appointment_id:
+            if report_type == 'reading':
+                reports = StudentReadingCpeaReport.objects.filter(student_id=student_id, appointment_id=appointment_id)
+                print("neter here")
+            elif report_type == 'writing' or report_type == 'math':
+                reports = StudentCpeaReport.objects.filter(student_id=student_id, appointment_id=appointment_id)
             else:
-                student_cpea_report = StudentCpeaReport.objects.filter(student=student_id)
-            
-            serializers = StudentCpeaReportSerializer(student_cpea_report, many=True)
-            return Response({
-                "sucess": True,
-                "status": "success",
-                "message":"CPEA Results..!!",
-                "results": serializers.data,
-            })
+                return Response({"error": "Invalid report type"}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            if report_type == 'reading':
+                reports = StudentReadingCpeaReport.objects.filter(student_id=student_id)
+            elif report_type == 'writing' or report_type == 'math':
+                reports = StudentCpeaReport.objects.filter(student_id=student_id)
+            else:
+                return Response({"error": "Invalid report type"}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = StudentReadingCpeaReportSerializer(reports, many=True) if report_type == 'reading' else StudentCpeaReportSerializer(reports, many=True)
+
+        return Response({
+            "success": True,
+            "status": "success",
+            "message": f"{report_type.capitalize()} CPEA Reports",
+            "results": serializer.data,
+        })
     
     
     
@@ -2892,20 +2908,20 @@ class ReadingCpeaBaseViewSet(BaseViewset):
             return Response(str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 
-    def get_by_id(self, request, student_id):
-        try:
-            reports = StudentReadingCpeaReport.objects.filter(student_id=student_id)
-            serializer = StudentReadingCpeaReportSerializer(reports, many=True)
-            return Response({
-            "success": True,
-            "status": "success",
-            "message": "CPEA Reading Report",
-            "results": serializer.data,
-            })
-        except StudentReadingCpeaReport.DoesNotExist:
-            return Response({"error": "Student reports not found"}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response(str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    # def get_by_id(self, request, student_id):
+    #     try:
+    #         reports = StudentReadingCpeaReport.objects.filter(student_id=student_id)
+    #         serializer = StudentReadingCpeaReportSerializer(reports, many=True)
+    #         return Response({
+    #         "success": True,
+    #         "status": "success",
+    #         "message": "CPEA Reading Report",
+    #         "results": serializer.data,
+    #         })
+    #     except StudentReadingCpeaReport.DoesNotExist:
+    #         return Response({"error": "Student reports not found"}, status=status.HTTP_404_NOT_FOUND)
+    #     except Exception as e:
+    #         return Response(str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
      
 
     
