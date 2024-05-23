@@ -549,7 +549,7 @@ class AssessmentViewSet(BaseViewset, BasePaginator):
 
 
 class QuestionViewSet(BaseViewset):
-    permission_classes = ~IsNotStudentOrGuest
+    permission_classes = (~IsNotStudentOrGuest,)
     serializer_class = QuestionSerializer
     model = Question
 
@@ -559,6 +559,7 @@ class QuestionViewSet(BaseViewset):
 
 
 class FetchQuestionViewSet(BaseViewset):
+    permission_classes = ((~IsGuest | ~IsTypist),)
 
     def questions_by_ids(self, request):
         question_ids = request.data.get("question_ids")
@@ -1230,7 +1231,7 @@ class GenerateAssessmentSessionView(APIView):
 
 
 class GenerateBulkAssessmentSessionView(APIView):
-    permission_classes = IsPlatformAdmin | IsTutor | IsManager | IsUserManager
+    permission_classes = ((IsPlatformAdmin | IsTutor | IsManager | IsUserManager),)
 
     def post(self, request, pk):
         if request.user.is_active and request.user.role not in [
@@ -1315,7 +1316,11 @@ class GenerateBulkAssessmentSessionView(APIView):
 
 
 class RenderAssessmentSessionView(APIView):
-    permission_classes = ((~IsCounselor | ~IsParent | ~IsTypist),)
+    permission_classes = (
+        ~IsCounselor,
+        ~IsParent,
+        ~IsTypist,
+    )
 
     def post(self, request):
         user_assessment_session_id = request.data.get("uas_id")
@@ -1390,7 +1395,11 @@ class RenderAssessmentSessionView(APIView):
 
 
 class UserAssessmentSessionSectionQuestionsView(APIView):
-    permission_classes = ((~IsTypist | ~IsParent | ~IsCounselor),)
+    permission_classes = (
+        ~IsTypist,
+        ~IsParent,
+        ~IsCounselor,
+    )
 
     def post(self, request):
         uas_id = request.data.get("uas_id")
@@ -1423,7 +1432,11 @@ class UserAssessmentSessionSectionQuestionsView(APIView):
 
 
 class UserAllocatedAssessmentsEndpoint(APIView, BasePaginator):
-    permission_classes = ((IsNotStudentOrGuest | ~IsParent | ~IsGuest),)
+    permission_classes = (
+        IsNotStudentOrGuest,
+        ~IsParent,
+        ~IsCounselor,
+    )
 
     def get(self, request, pk):
         kind = request.GET.get("kind", "MOCK")
@@ -1465,7 +1478,7 @@ class UserAllocatedAssessmentsEndpoint(APIView, BasePaginator):
 
 
 class UserAllocatedAssessmentsDashboardEndpoint(APIView):
-    permission_classes = ((IsPlatformAdmin | ~IsNotStudentOrGuest),)
+    permission_classes = ((IsPlatformAdmin | IsGuest | IsStudent),)
 
     def get(self, request):
         now = timezone.now()
@@ -1486,7 +1499,12 @@ class UserAllocatedAssessmentsDashboardEndpoint(APIView):
 
 
 class UserAllocatedAssessmentCheckEndpoint(APIView):
-    permission_classes = ((~IsTypist | ~IsParent | ~IsCounselor | ~IsGuest),)
+    permission_classes = (
+        ~IsTypist,
+        ~IsParent,
+        ~IsCounselor,
+        ~IsGuest,
+    )
 
     def get(self, request):
         assessment_id = request.GET.get("assessment_id", False)
@@ -1511,7 +1529,10 @@ class UserAllocatedAssessmentCheckEndpoint(APIView):
 
 
 class UserAllocatedAssessmentMistakesEndpoint(APIView):
-    permission_class = ((~IsTypist | ~IsGuest),)
+    permission_class = (
+        ~IsTypist,
+        ~IsGuest,
+    )
 
     def get(self, request):
         all_sessions = UserAssessmentSession.objects.filter(
@@ -1741,7 +1762,7 @@ def item_response_function(theta_array, irt_a, irt_b, irt_c, scored_response_vec
 
 
 class ComputeScaledScoreEndpoint(APIView):
-    permission_classes = ((IsNotStudentOrGuest | ~IsParent | ~IsCounselor | ~IsTypist),)
+    permission_classes = ((IsPlatformAdmin | IsUserManager | IsManager | IsTutor),)
 
     def post(self, request):
         assessment = Assessment.objects.get(pk=request.data.get("assessment_id"))
@@ -1851,6 +1872,10 @@ class UserAssessmentAttemptEndpoint(BaseViewset):
             | read_only(IsParent)
             | read_only(IsCounselor)
             | read_only(IsUserManager)
+            | IsStudent
+            | IsTutor
+            | IsGuest
+            | IsManager
         ),
     )
     serializer_class = UserAttemptSerializer
@@ -1875,10 +1900,16 @@ class UserAssessmentAttemptEndpoint(BaseViewset):
 
 class UserAssessmentAttemptViewSet(BaseViewset):
     permission_classes = (
-        ~IsTypist
-        | read_only(IsParent)
-        | read_only(IsCounselor)
-        | read_only(IsUserManager),
+        (
+            ~IsTypist
+            | read_only(IsParent)
+            | read_only(IsCounselor)
+            | read_only(IsUserManager)
+            | IsStudent
+            | IsTutor
+            | IsGuest
+            | IsManager
+        ),
     )
     serializer_class = UserAttemptSerializer
     model = UserAttempt
@@ -1903,7 +1934,7 @@ class AllAssessmentSessionEndpoint(APIView):
 
 
 class CreateUserAttemptBulk(APIView):
-    # permission_classes = (AllowAny,)
+    permission_classes = (~IsTypist,)
 
     def post(self, request):
         assessment_id = request.data.get("assessment_id")
@@ -1953,7 +1984,7 @@ def flatten_list(lst):
 
 
 class MistakeAnalyserEndpoint(BasePaginator, APIView):
-    permission_class = ((~IsTypist | ~IsGuest),)
+    permission_class = (~IsTypist , ~IsGuest, )
     # def add_attempts(self, results, request):
     #     question_ids = []
     #     for result in results:
@@ -2159,7 +2190,7 @@ def flatten_list_with_object(lst):
 
 
 class StudentMyPerformanceAnalyticsEndpoint(APIView):
-    permission_classes = ((~IsTypist | ~IsGuest),)
+    permission_classes = (~IsTypist , ~IsGuest)
 
     def post(self, request):
         user = request.data.get("user")
@@ -4318,6 +4349,8 @@ class WeeklyProgressSerializer(serializers.ModelSerializer):
 
 
 class WeeklyProgressViewSet(BaseViewset):
+    permission_classes = (IsPlatformAdmin,)
+
     def create_weekly_progress(self, request, pk):
         start_date = request.data.get("start_date")
         end_date = request.data.get("end_date")
