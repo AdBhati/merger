@@ -2179,7 +2179,7 @@ class CustomPagination(PageNumberPagination):
 
 
 class AssignmentViewSet(BaseViewset, BasePaginator):
-    permission_classes = ((IsPlatformAdmin | IsTypist),)
+    permission_classes = ((IsPlatformAdmin | IsTypist | IsStudent),)
     serializer = AssignmentSerializer
 
     model = Assignment
