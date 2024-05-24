@@ -1868,11 +1868,7 @@ class TeacherAppointmentViewSet(BaseViewset, BasePaginator):
 
 
 class AppointmentAssignemntViewset(BaseViewset, BasePaginator):
-    permission_classes = (
-        ~IsGuest,
-        ~IsStudent,
-        ~IsTypist,
-    )
+    permission_classes = (IsGuest | IsStudent | IsTypist,)
 
     def get_student_class_assignment(self, request, student_id, appointment_id=None):
 
@@ -3456,9 +3452,17 @@ class CpeaBaseViewSet(BaseViewset):
             "COULD_NOT_RECALL": 0,
         }
 
+        remedial_action_mapping ={
+            0: "Revise and write the rules on Interrupters/Compound subject/Prepositional phrases of SVA. Post a screenshot of the same on the group, tagging your writing tutor.",
+            1: "Revise and write the rules on Interrupters/Compound subject/Prepositional phrases of SVA. Post a screenshot of the same on the group, tagging your writing tutor.",
+            2: "No action required.",
+        }
+
+
         for answer in answers_data:
             answer_score = score_mapping.get(answer.get("remark"), 0)
             answer["score"] = answer_score
+            answer["tutor_comments"]=remedial_action_mapping.get(answer_score, "No action required")
 
         cpea_report = StudentCpeaReport.objects.create(
             student=student,
