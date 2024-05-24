@@ -1285,7 +1285,7 @@ class StudentRelatedTeacherViewSet(BaseViewset, BasePaginator):
 
 
 class AppointmentAgendaViewSet(BaseViewset, BasePaginator):
-    permission_classes = (IsPlatformAdmin,)
+    permission_classes = (IsPlatformAdmin | IsStudent,)
 
     def get_appointment_molecule(self, request, student_id, tutor_id):
         try:
@@ -3438,6 +3438,7 @@ class CpeaBaseViewSet(BaseViewset):
         try:
             student = User.objects.get(id=student_id)
             tutor = User.objects.get(id=tutor_id)
+            report_type = request.get.GET('report_type')
             appointment = Appointments.objects.get(id=request.data.get("appointment"))
 
         except User.DoesNotExist:
@@ -3452,10 +3453,17 @@ class CpeaBaseViewSet(BaseViewset):
             "COULD_NOT_RECALL": 0,
         }
 
-        remedial_action_mapping ={
-            0: "Revise and write the rules on Interrupters/Compound subject/Prepositional phrases of SVA. Post a screenshot of the same on the group, tagging your writing tutor.",
-            1: "Revise and write the rules on Interrupters/Compound subject/Prepositional phrases of SVA. Post a screenshot of the same on the group, tagging your writing tutor.",
-            2: "No action required.",
+        remedial_action_mapping = {
+            "writing": {
+                0: "Revise and write the rules on Interrupters/Compound subject/Prepositional phrases of SVA. Post a screenshot of the same on the group, tagging your writing tutor.",
+                1: "Revise and write the rules on Interrupters/Compound subject/Prepositional phrases of SVA. Post a screenshot of the same on the group, tagging your writing tutor.",
+                2: "No action required.",
+            },
+            "math": {
+                0: "Revise the interpretations of slope and y-intercept of a slope intercept line. Write the definitions 3 times and post the definitions on your group.",
+                1: "Revise the interpretations of slope and y-intercept of a slope intercept line. Write the definitions 3 times and post the definitions on your group.",
+                2: "No action required.",
+            }
         }
 
 
