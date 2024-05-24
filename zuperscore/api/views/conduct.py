@@ -3551,7 +3551,7 @@ class GroupClassSerializer(serializers.ModelSerializer):
 
 
 class GroupClassesBaseViewSet(BaseViewset):
-    permission_classes = ((IsPlatformAdmin | IsSsoManager),)
+    permission_classes = ((IsPlatformAdmin | IsSsoManager | IsStudent),)
 
     def get_dayScheduler_group_events(self, request, student_id):
         try:
