@@ -1869,7 +1869,7 @@ class TeacherAppointmentViewSet(BaseViewset, BasePaginator):
 
 
 class AppointmentAssignemntViewset(BaseViewset, BasePaginator):
-    permission_classes = (IsGuest | IsStudent | IsTypist,)
+    permission_classes = (IsGuest | IsStudent | IsTypist | IsTutor | IsPlatformAdmin | IsManager,)
 
     def get_student_class_assignment(self, request, student_id, appointment_id=None):
 
