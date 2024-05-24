@@ -379,7 +379,7 @@ class AssessmentSectionViewSet(BaseViewset):
 
 
 class AssessmentViewSet(BaseViewset, BasePaginator):
-    permission_classes = (IsPlatformAdmin | IsStudent, IsTutor,)
+    permission_classes = ((IsPlatformAdmin | IsStudent, IsTutor),)
     serializer_class = AssessmentSerializer
     model = Assessment
 

@@ -1286,7 +1286,7 @@ class StudentRelatedTeacherViewSet(BaseViewset, BasePaginator):
 
 
 class AppointmentAgendaViewSet(BaseViewset, BasePaginator):
-    permission_classes = (IsPlatformAdmin | IsStudent | IsTutor,)
+    permission_classes = ((IsPlatformAdmin | IsStudent | IsTutor),)
 
     def get_appointment_molecule(self, request, student_id, tutor_id):
         try:
@@ -1869,7 +1869,7 @@ class TeacherAppointmentViewSet(BaseViewset, BasePaginator):
 
 
 class AppointmentAssignemntViewset(BaseViewset, BasePaginator):
-    permission_classes = (IsGuest | IsStudent | IsTypist | IsTutor | IsPlatformAdmin | IsManager,)
+    permission_classes = ((IsGuest | IsStudent | IsTypist | IsTutor | IsPlatformAdmin | IsManager),)
 
     def get_student_class_assignment(self, request, student_id, appointment_id=None):
 
@@ -3435,124 +3435,7 @@ class CpeaBaseViewSet(BaseViewset):
             status=status.HTTP_200_OK,
         )
 
-    def post_cpea_assignment_report(self, request, student_id, tutor_id):
-        try:
-            student = User.objects.get(id=student_id)
-            tutor = User.objects.get(id=tutor_id)
-            report_type = request.get.GET('report_type')
-            appointment = Appointments.objects.get(id=request.data.get("appointment"))
-
-        except User.DoesNotExist:
-            return Response({"error": "Student or Tutor not found."}, status=404)
-
-        answers_data = request.data.get("answers", [])
-        overall_feedback = request.data.get("overall_feedback")
-
-        score_mapping = {
-            "WELL_LEARNT": 2,
-            "REMEMBERS_PARTIALLY": 1,
-            "COULD_NOT_RECALL": 0,
-        }
-
-        remedial_action_mapping = {
-            "writing": {
-                0: "Revise and write the rules on Interrupters/Compound subject/Prepositional phrases of SVA. Post a screenshot of the same on the group, tagging your writing tutor.",
-                1: "Revise and write the rules on Interrupters/Compound subject/Prepositional phrases of SVA. Post a screenshot of the same on the group, tagging your writing tutor.",
-                2: "No action required.",
-            },
-            "math": {
-                0: "Revise the interpretations of slope and y-intercept of a slope intercept line. Write the definitions 3 times and post the definitions on your group.",
-                1: "Revise the interpretations of slope and y-intercept of a slope intercept line. Write the definitions 3 times and post the definitions on your group.",
-                2: "No action required.",
-            }
-        }
-
-
-        for answer in answers_data:
-            answer_score = score_mapping.get(answer.get("remark"), 0)
-            answer["score"] = answer_score
-            answer["tutor_comments"]=remedial_action_mapping.get(answer_score, "No action required")
-
-        cpea_report = StudentCpeaReport.objects.create(
-            student=student,
-            tutor=tutor,
-            appointment=appointment,
-            # status=status,
-            answers=answers_data,
-            overall_feedback=overall_feedback,
-            # assignment=assignment,
-        )
-
-        appointment.is_completed = True
-        appointment.save()
-
-        serializer = StudentCpeaReportSerializer(cpea_report)
-        return Response(
-            {
-                "success": True,
-                "status": "success",
-                "message": "CPEA report submitted successfully",
-                "results": serializer.data,
-            }
-        )
-
-    def get_student_cpea_report(self, request, student_id):
-
-        report_type = request.GET.get("report_type")
-        appointment_id = request.query_params.get("appointment_id")
-
-        if appointment_id:
-            if report_type == "reading":
-                reports = StudentReadingCpeaReport.objects.filter(
-                    student_id=student_id, appointment_id=appointment_id
-                )
-                print("neter here")
-            elif report_type == "writing" or report_type == "math":
-                reports = StudentCpeaReport.objects.filter(
-                    student_id=student_id, appointment_id=appointment_id
-                )
-            else:
-                return Response(
-                    {"error": "Invalid report type"}, status=status.HTTP_400_BAD_REQUEST
-                )
-        else:
-            if report_type == "reading":
-                reports = StudentReadingCpeaReport.objects.filter(student_id=student_id)
-            elif report_type == "writing" or report_type == "math":
-                reports = StudentCpeaReport.objects.filter(student_id=student_id)
-            else:
-                return Response(
-                    {"error": "Invalid report type"}, status=status.HTTP_400_BAD_REQUEST
-                )
-
-        serializer = (
-            StudentReadingCpeaReportSerializer(reports, many=True)
-            if report_type == "reading"
-            else StudentCpeaReportSerializer(reports, many=True)
-        )
-
-        return Response(
-            {
-                "success": True,
-                "status": "success",
-                "message": f"{report_type.capitalize()} CPEA Reports",
-                "results": serializer.data,
-            }
-        )
-
-    def update_student_cpea_report(self, request, student_id, appointment_id):
-        cpea_report = StudentCpeaReport.objects.get(
-            student=student_id, appointment=appointment_id
-        )
-
-        is_student_view = request.data.get("is_student_view", False)
-        cpea_report.is_student_view = is_student_view
-        cpea_report.save()
-
-        return Response(
-            {"sucess": True, "status": "success", "message": "Update Sucessfully"}
-        )
-
+    
     def get_cpea_questions(self, request, mega_domain_name):
         mega_domain = MegaDomain.objects.filter(name=mega_domain_name).values_list(
             "id", flat=True
@@ -3575,8 +3458,8 @@ class StudentReadingCpeaReportSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class ReadingCpeaBaseViewSet(BaseViewset):
-    permission_classes = (IsPlatformAdmin | IsTutor,)
+class CpeaReportBaseViewSet(BaseViewset):
+    permission_classes = ((IsPlatformAdmin | IsTutor | IsStudent),)
 
     def create_reading_cpea_report(self, request):
         try:
@@ -3586,8 +3469,9 @@ class ReadingCpeaBaseViewSet(BaseViewset):
             description = request.data.get("description")
             reports = request.data.get("reports")
 
-            if type == "Reading":
-                mega_domain = MegaDomain.objects.get(name="Reading")
+            if type == "Reading" or type == "Math" or type == "Writing":
+                mega_domain = MegaDomain.objects.filter(name=type).first()
+                print("mega_domain===>",mega_domain)
                 mega_domain_id = mega_domain.id
 
             appointment = Appointments.objects.get(id=appointment_id)
@@ -3623,21 +3507,41 @@ class ReadingCpeaBaseViewSet(BaseViewset):
             )
         except Exception as e:
             return Response(str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        
+    def get_student_cpea_report(self, request, student_id):
+        appointment_id = request.query_params.get("appointment_id")
 
-    # def get_by_id(self, request, student_id):
-    #     try:
-    #         reports = StudentReadingCpeaReport.objects.filter(student_id=student_id)
-    #         serializer = StudentReadingCpeaReportSerializer(reports, many=True)
-    #         return Response({
-    #         "success": True,
-    #         "status": "success",
-    #         "message": "CPEA Reading Report",
-    #         "results": serializer.data,
-    #         })
-    #     except StudentReadingCpeaReport.DoesNotExist:
-    #         return Response({"error": "Student reports not found"}, status=status.HTTP_404_NOT_FOUND)
-    #     except Exception as e:
-    #         return Response(str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        if appointment_id:
+            reports = StudentReadingCpeaReport.objects.filter(student_id=student_id, appointment_id=appointment_id)
+
+        else:
+            reports = StudentReadingCpeaReport.objects.filter(student_id=student_id)
+
+        serializer = StudentReadingCpeaReportSerializer(reports, many=True)
+       
+
+        return Response(
+            {
+                "success": True,
+                "status": "success",
+                "message": "CPEA Reports",
+                "results": serializer.data,
+            }
+        )
+    
+    def update_student_cpea_report(self, request, student_id, appointment_id):
+        cpea_report = StudentCpeaReport.objects.get(
+            student=student_id, appointment=appointment_id
+        )
+
+        is_student_view = request.data.get("is_student_view", False)
+        cpea_report.is_student_view = is_student_view
+        cpea_report.save()
+
+        return Response(
+            {"sucess": True, "status": "success", "message": "Update Sucessfully"}
+        )
 
 
 class GroupClassSerializer(serializers.ModelSerializer):
@@ -3786,7 +3690,7 @@ class AssignGroupClassesBaseViewSet(BaseViewset):
 
 
 class StudentGroupEventBaseViewSet(BaseViewset):
-    permission_classes = (IsPlatformAdmin, IsSsoManager)
+    permission_classes = ((IsPlatformAdmin | IsSsoManager),)
 
     def get_student_group_events(self, request):
         logged_in_user_sso = request.user

@@ -116,10 +116,10 @@ from zuperscore.api.views.conduct import (
     CompletedClassViewSet,
     CpeaBaseViewSet,
     CpeaOverRideViewSet,
+    CpeaReportBaseViewSet,
     GroupClassesBaseViewSet,
     LastClassAgendaViewSet,
     LastClassViewSet,
-    ReadingCpeaBaseViewSet,
     SsoStudentBaseViewSet,
     StudentCategoryViewSet,
     AppointmentViewSet,
@@ -740,9 +740,9 @@ urlpatterns = [
     path('conduct/cpea-assignment/<str:mega_domain>', CpeaBaseViewSet.as_view({"get":"get_cpea_assignment"})),
     path('conduct/cpea-assignment-report/<int:student_id>/<int:tutor_id>/', CpeaBaseViewSet.as_view({"post":"post_cpea_assignment_report"})),
     path('conduct/student-cpea-report/<int:student_id>/',CpeaBaseViewSet.as_view({"get":"get_student_cpea_report"})),
-    path('conduct/student-cpea-report/<int:student_id>/<int:appointment_id>',CpeaBaseViewSet.as_view({"put":"update_student_cpea_report"})),
-    path('conduct/reading-student-cpea-report/',ReadingCpeaBaseViewSet.as_view({"post":"create_reading_cpea_report"})),
-    # path('conduct/reading-student-cpea-report/<int:student_id>',ReadingCpeaBaseViewSet.as_view({"get":"get_by_id"})),
+    path('conduct/student-cpea-report/<int:student_id>/<int:appointment_id>',CpeaReportBaseViewSet.as_view({"put":"update_student_cpea_report"})),
+    path('conduct/reading-student-cpea-report/',CpeaReportBaseViewSet.as_view({"post":"create_reading_cpea_report"})),
+    path('conduct/student-cpea-report/<int:student_id>/',CpeaReportBaseViewSet.as_view({"get":"get_student_cpea_report"})),
 
 
 
