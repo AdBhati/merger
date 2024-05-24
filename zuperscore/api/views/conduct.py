@@ -3764,7 +3764,7 @@ class StudentGroupEventBaseViewSet(BaseViewset):
 
 
 class AllotGroupClassBaseViewSet(BaseViewset):
-    permission_classes = (IsPlatformAdmin,)
+    permission_classes = ((IsPlatformAdmin | IsSsoManager),)
 
     def allot_group_classes(self, request):
         try:
