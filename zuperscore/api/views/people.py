@@ -468,6 +468,7 @@ class PeopleView(APIView, BasePaginator):
             | IsCounselor
             | IsParent
             | IsManager
+            | IsStudent
         ),
     )
     filterset_fields = (
@@ -1812,7 +1813,7 @@ class AllocateManagerViewSet(BaseViewset):
 
 class UserCustomFieldViewSet(viewsets.ModelViewSet):
     permission_classes = (
-        (IsPlatformAdmin | IsUserManager | IsParent | IsCounselor | IsManager),
+        (IsPlatformAdmin | IsUserManager | IsParent | IsCounselor | IsManager | IsStudent | IsTutor),
     )
 
     def list(self, serializer):

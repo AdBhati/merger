@@ -981,7 +981,7 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
 
             booking_ids = [item.get("booking") for item in data]
             day_scheduler_responses = []
-            # expired_appointments = []
+            expired_appointments = []
 
             for booking_id in booking_ids:
                 day_scheduler_response = self.get_dayScheduler_booking(
@@ -1013,34 +1013,35 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                     appointment.title = subject
                     appointment.save()
 
-                # duration_minutes = int(appointment.duration)
-                # class_end_time = appointment.start_at + timedelta(minutes=duration_minutes)
-                # current_time = datetime.now(timezone.utc)
+                if appointment.duration is not None:
+                    duration_minutes = int(appointment.duration)
+                    class_end_time = appointment.start_at + timedelta(minutes=duration_minutes)
+                    current_time = datetime.now(timezone.utc)
 
-                # if current_time > class_end_time:
+                    if current_time > class_end_time:
 
-                #     appointment_report = AppointmentReport.objects.filter(appointment_id=appointment_id).first()
-                #     if appointment_report:
-                #         is_student_joined = appointment_report.is_student_joined
-                #         is_tutor_joined = appointment_report.is_tutor_joined
+                        appointment_report = AppointmentReport.objects.filter(appointment_id=appointment_id).first()
+                        if appointment_report:
+                            is_student_joined = appointment_report.is_student_joined
+                            is_tutor_joined = appointment_report.is_tutor_joined
 
-                #         if not is_student_joined and not is_tutor_joined:
-                #             status = 'unattended'
-                #             reason = 'BOTH_TUTOR_AND_STUDENT_NOT_JOIN'
-                #         elif is_student_joined and not is_tutor_joined:
-                #             status = None
-                #             reason = 'TUTOR_NOT_JOINED'
-                #         elif not is_student_joined and is_tutor_joined:
-                #             status = None
-                #             reason = 'STUDENT_NOT_JOINED'
-                #         else:
-                #             status = 'attended'
-                #             reason = 'BOTH_TUTOR_AND_STUDENT_JOIN'
+                            if not is_student_joined and not is_tutor_joined:
+                                status = 'unattended'
+                                reason = 'BOTH_TUTOR_AND_STUDENT_NOT_JOIN'
+                            elif is_student_joined and not is_tutor_joined:
+                                status = None
+                                reason = 'TUTOR_NOT_JOINED'
+                            elif not is_student_joined and is_tutor_joined:
+                                status = None
+                                reason = 'STUDENT_NOT_JOINED'
+                            else:
+                                status = 'attended'
+                                reason = 'BOTH_TUTOR_AND_STUDENT_JOIN'
 
-                #         appointment_report.status = status
-                #         appointment_report.reason = reason
-                #         appointment_report.save()
-                #         expired_appointments.append(appointment_data)
+                            appointment_report.status = status
+                            appointment_report.reason = reason
+                            appointment_report.save()
+                            expired_appointments.append(appointment_data)
 
                 taught_molecules = AppointmentMolecule.objects.filter(
                     appointment__id=appointment_id, is_completed=True
@@ -1106,8 +1107,8 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
                 appointment_data["home_assignment_present"] = home_assignment_present
                 appointment_data["has_molecules"] = has_molecules
 
-            # for expired_appointment in expired_appointments:
-            #     data.remove(expired_appointment)
+            for expired_appointment in expired_appointments:
+                data.remove(expired_appointment)
 
             return Response(
                 {
@@ -2815,7 +2816,7 @@ class AssignCategoryViewSet(BaseViewset):
 
 
 class UsersTeamViewSet(BaseViewset):
-    permission_classes = ((IsPlatformAdmin | IsSsoManager | IsUserManager),)
+    permission_classes = ((IsPlatformAdmin | IsSsoManager | IsUserManager | IsStudentReadOnly),)
 
     def user_list(self, request):
         try:
