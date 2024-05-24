@@ -3563,7 +3563,7 @@ class StudentReadingCpeaReportSerializer(serializers.ModelSerializer):
 
 
 class ReadingCpeaBaseViewSet(BaseViewset):
-    permission_classes = (IsPlatformAdmin,)
+    permission_classes = (IsPlatformAdmin | IsTutor,)
 
     def create_reading_cpea_report(self, request):
         try:
