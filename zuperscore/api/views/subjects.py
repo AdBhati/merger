@@ -1754,7 +1754,7 @@ class NewStudentSessionPlanTreeSerializer(BaseSerializer):
 
 
 class StudentSessionViewSet(BaseViewset, BasePaginator):
-    permission_classes = (IsPlatformAdmin,)
+    permission_classes = (IsPlatformAdmin | IsStudent,)
     serializer = StudentSessionPlanSerializer
     model = StudentSessionPlan
 
