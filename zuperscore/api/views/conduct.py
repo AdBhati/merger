@@ -3570,6 +3570,7 @@ class ReadingCpeaBaseViewSet(BaseViewset):
             type = request.data.get("type")
             student_id = request.data.get("student_id")
             appointment_id = request.data.get("appointment")
+            description = request.data.get("description")
             reports = request.data.get("reports")
 
             if type == "Reading":
@@ -3583,6 +3584,8 @@ class ReadingCpeaBaseViewSet(BaseViewset):
                 report_data["student"] = student_id
                 report_data["mega_domain"] = mega_domain_id
                 report_data["appointment"] = appointment_id
+                report_data["description"] = description
+
                 report_data["meta_key"] = "default_key"
 
                 serializer = StudentReadingCpeaReportSerializer(data=report_data)
