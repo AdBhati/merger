@@ -1285,7 +1285,7 @@ class StudentRelatedTeacherViewSet(BaseViewset, BasePaginator):
 
 
 class AppointmentAgendaViewSet(BaseViewset, BasePaginator):
-    permission_classes = (IsPlatformAdmin | IsStudent,)
+    permission_classes = (IsPlatformAdmin | IsStudent | IsTutor,)
 
     def get_appointment_molecule(self, request, student_id, tutor_id):
         try:
