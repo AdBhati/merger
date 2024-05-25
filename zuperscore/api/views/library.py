@@ -55,7 +55,7 @@ class SettingsSerializer(BaseSerializer):
         fields = ["disabled_mistake_analyzer"]
 
 class SettingsViewSet(BaseViewset):
-    permission_classes = (~IsTypist, ~IsGuest)
+    permission_classes = (~IsTypist, ~IsGuest,)
     serializer_class = SettingsSerializer
     model = Settings
 

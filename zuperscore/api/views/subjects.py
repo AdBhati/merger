@@ -246,7 +246,6 @@ class SubjectViewSet(BaseViewset):
             | read_only(IsUserManager)
             | IsPlatformAdmin
             | IsTutor
-            | ~IsTypist
             | IsManager
         ),
     )
@@ -1754,7 +1753,7 @@ class NewStudentSessionPlanTreeSerializer(BaseSerializer):
 
 
 class StudentSessionViewSet(BaseViewset, BasePaginator):
-    permission_classes = (IsPlatformAdmin | IsStudent,)
+    permission_classes = ((IsPlatformAdmin | IsStudent),)
     serializer = StudentSessionPlanSerializer
     model = StudentSessionPlan
 

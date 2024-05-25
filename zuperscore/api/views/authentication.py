@@ -39,10 +39,12 @@ from zuperscore.db.models.conduct import (
 )
 
 from zuperscore.utils.msg import send_sms
+
 PHONE_NUMBER_REGEX_PATTERN = ".*?(\\(?\\d{3}\\D{0,3}\\d{3}\\D{0,3}\\d{4}).*?"
 EMAIL_ADDRESS_REGEX_PATTERN = (
     "([A-Za-z0-9]+[.-_])*[A-Za-z0-9]+@[A-Za-z0-9-]+(\\.[A-Z|a-z]{2,})+"
 )
+
 
 def check_valid_phone_number(phone_number):
     if len(phone_number) > 15:
@@ -69,16 +71,18 @@ class RefreshAccessToken(APIView):
     permission_classes = (AllowAny,)
 
     def post(self, request):
-        refresh_token = request.data.get('refresh_token', False)
+        refresh_token = request.data.get("refresh_token", False)
         if refresh_token:
             try:
                 decoded_token = RefreshToken(refresh_token)
-                user_id = decoded_token['user_id']
+                user_id = decoded_token["user_id"]
                 user = User.objects.get(id=user_id)
 
                 access_token, _ = get_tokens_for_user(user)
-                return Response({'access_token':access_token}, status=status.HTTP_201_CREATED)
-            
+                return Response(
+                    {"access_token": access_token}, status=status.HTTP_201_CREATED
+                )
+
             except User.DoesNotExist:
                 return Response(
                     {
@@ -86,23 +90,20 @@ class RefreshAccessToken(APIView):
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            
+
             except Exception as e:
-                print('refresh error', e)
+                print("refresh error", e)
                 return Response(
-                    {
-                        "error" : "Something went wrong"
-                    },
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-        else:
-            return Response(
-                    {
-                        "error": "Invalid or no refresh token."
-                    },
+                    {"error": "Something went wrong"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+
+        else:
+            return Response(
+                {"error": "Invalid or no refresh token."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
 
 class SignInEndpoint(APIView):
     permission_classes = (AllowAny,)
@@ -235,7 +236,7 @@ class SignInEndpoint(APIView):
 
 
 class SignUpEndpoint(APIView):
-    permission_classes = [IsAdminOrUserManager]
+    permission_classes = (IsAdminOrUserManager,)
 
     def post(self, request):
         try:
@@ -244,7 +245,7 @@ class SignUpEndpoint(APIView):
             mobile_number = request.data.get("mobile_number")
             email = request.data.get("email").strip().lower()
             password = request.data.get("password")
-            role = request.data.get('role')
+            role = request.data.get("role")
             if User.objects.filter(email=email).exists():
                 return Response(
                     {
@@ -283,7 +284,9 @@ class SignUpEndpoint(APIView):
 
             serialized_user = UserSerializer(user).data
 
-            serialized_student_availability = StudentAvailabilitySerializer(StudentAvailability.objects.create(student=user)).data
+            serialized_student_availability = StudentAvailabilitySerializer(
+                StudentAvailability.objects.create(student=user)
+            ).data
 
             access_token, refresh_token = get_tokens_for_user(user)
             data = {
@@ -340,9 +343,7 @@ class SignOutEndpoint(APIView):
 
 
 class ForgotPasswordView(APIView):
-    permission_classes = [
-        AllowAny,
-    ]
+    permission_classes = (AllowAny,)
 
     def post(self, request):
         email = request.data.get("email")
@@ -392,6 +393,7 @@ class ResetPasswordView(APIView):
             print(e)
             return Response({"message": "failed"}, status=status.HTTP_400_BAD_REQUEST)
 
+
 class SendMobileOtpView(APIView):
     def post(self, request):
         try:
@@ -405,6 +407,7 @@ class SendMobileOtpView(APIView):
         except Exception as e:
             print(e)
             return Response({"message": "failed"}, status=400)
+
 
 class VerifyMobileOtpView(APIView):
     def post(self, request):

@@ -78,11 +78,7 @@ class IsGuest(BasePermission):
 # read only permissions
 
 
-class IsStudentReadOnly(IsStudent):
 
-    def has_object_permission(self, request, view, obj):
-        # Read-only permission for students
-        return request.method in SAFE_METHODS
 
 
 # class IsManagerReadOnly(IsManager):

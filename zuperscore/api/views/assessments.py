@@ -379,7 +379,7 @@ class AssessmentSectionViewSet(BaseViewset):
 
 
 class AssessmentViewSet(BaseViewset, BasePaginator):
-    permission_classes = ((IsPlatformAdmin | IsStudent, IsTutor),)
+    permission_classes = ((IsPlatformAdmin | IsStudent | IsTutor),)
     serializer_class = AssessmentSerializer
     model = Assessment
 
@@ -1868,8 +1868,8 @@ class ComputeScaledScoreEndpoint(APIView):
 class UserAssessmentAttemptEndpoint(BaseViewset):
     permission_classes = (
         (
-            ~IsTypist
-            | read_only(IsParent)
+            
+         read_only(IsParent)
             | read_only(IsCounselor)
             | read_only(IsUserManager)
             | IsStudent
@@ -1901,8 +1901,7 @@ class UserAssessmentAttemptEndpoint(BaseViewset):
 class UserAssessmentAttemptViewSet(BaseViewset):
     permission_classes = (
         (
-            ~IsTypist
-            | read_only(IsParent)
+            read_only(IsParent)
             | read_only(IsCounselor)
             | read_only(IsUserManager)
             | IsStudent
@@ -2190,7 +2189,7 @@ def flatten_list_with_object(lst):
 
 
 class StudentMyPerformanceAnalyticsEndpoint(APIView):
-    permission_classes = (~IsTypist , ~IsGuest)
+    permission_classes = (~IsTypist , ~IsGuest,)
 
     def post(self, request):
         user = request.data.get("user")

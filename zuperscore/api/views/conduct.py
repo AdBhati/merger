@@ -1,9 +1,6 @@
 from collections import defaultdict
 import re
 from django.db.models.functions import Length
-from django.db.models.functions import Substr
-from django.db.models import IntegerField
-from django.forms import CharField
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers, status
 
@@ -14,11 +11,8 @@ import requests
 
 # from datetime import datetime, time
 import pytz
-import base64
-import os
 import math
 from dotenv import load_dotenv
-from zuperscore.db import models
 from zuperscore.db.models.base import EnglishCategory, MathCategory, User
 from zuperscore.utils.ip_address import get_client_ip
 from itertools import chain
@@ -34,13 +28,8 @@ from django.utils.timezone import now
 from django.db.models import Max
 from django.db.models.functions import Cast
 from django.db.models.functions import Lower
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from django.db.models import Count
-from django.db.models.functions import Coalesce
-from django.contrib.postgres.fields import ArrayField
 from django.db.models import Q, Count, Value, Case, When, F, Func
-from django.db.models import Value
-from django.db.models.functions import Concat
 from zuperscore.api.permissions import *
 
 
@@ -1015,28 +1004,32 @@ class AppointmentViewSet(BaseViewset, BasePaginator):
 
                 if appointment.duration is not None:
                     duration_minutes = int(appointment.duration)
-                    class_end_time = appointment.start_at + timedelta(minutes=duration_minutes)
+                    class_end_time = appointment.start_at + timedelta(
+                        minutes=duration_minutes
+                    )
                     current_time = datetime.now(timezone.utc)
 
                     if current_time > class_end_time:
 
-                        appointment_report = AppointmentReport.objects.filter(appointment_id=appointment_id).first()
+                        appointment_report = AppointmentReport.objects.filter(
+                            appointment_id=appointment_id
+                        ).first()
                         if appointment_report:
                             is_student_joined = appointment_report.is_student_joined
                             is_tutor_joined = appointment_report.is_tutor_joined
 
                             if not is_student_joined and not is_tutor_joined:
-                                status = 'unattended'
-                                reason = 'BOTH_TUTOR_AND_STUDENT_NOT_JOIN'
+                                status = "unattended"
+                                reason = "BOTH_TUTOR_AND_STUDENT_NOT_JOIN"
                             elif is_student_joined and not is_tutor_joined:
                                 status = None
-                                reason = 'TUTOR_NOT_JOINED'
+                                reason = "TUTOR_NOT_JOINED"
                             elif not is_student_joined and is_tutor_joined:
                                 status = None
-                                reason = 'STUDENT_NOT_JOINED'
+                                reason = "STUDENT_NOT_JOINED"
                             else:
-                                status = 'attended'
-                                reason = 'BOTH_TUTOR_AND_STUDENT_JOIN'
+                                status = "attended"
+                                reason = "BOTH_TUTOR_AND_STUDENT_JOIN"
 
                             appointment_report.status = status
                             appointment_report.reason = reason
@@ -1869,7 +1862,9 @@ class TeacherAppointmentViewSet(BaseViewset, BasePaginator):
 
 
 class AppointmentAssignemntViewset(BaseViewset, BasePaginator):
-    permission_classes = ((IsGuest | IsStudent | IsTypist | IsTutor | IsPlatformAdmin | IsManager),)
+    permission_classes = (
+        (IsGuest | IsStudent | IsTypist | IsTutor | IsPlatformAdmin | IsManager),
+    )
 
     def get_student_class_assignment(self, request, student_id, appointment_id=None):
 
@@ -2321,7 +2316,7 @@ class LastClassViewSet(BaseViewset, BasePaginator):
 
 
 class StudentAvailabilityViewSet(BaseViewset):
-    permission_classes = (~IsGuest, ~IsTypist)
+    permission_classes = (~IsGuest, ~IsTypist,)
     serializer_class = StudentAvailabilitySerializer
     model = StudentAvailability
 
@@ -2816,7 +2811,9 @@ class AssignCategoryViewSet(BaseViewset):
 
 
 class UsersTeamViewSet(BaseViewset):
-    permission_classes = ((IsPlatformAdmin | IsSsoManager | IsUserManager | IsStudentReadOnly),)
+    permission_classes = (
+        (IsPlatformAdmin | IsSsoManager | IsUserManager | read_only(IsStudent)),
+    )
 
     def user_list(self, request):
         try:
@@ -3435,7 +3432,6 @@ class CpeaBaseViewSet(BaseViewset):
             status=status.HTTP_200_OK,
         )
 
-    
     def get_cpea_questions(self, request, mega_domain_name):
         mega_domain = MegaDomain.objects.filter(name=mega_domain_name).values_list(
             "id", flat=True
@@ -3471,7 +3467,7 @@ class CpeaReportBaseViewSet(BaseViewset):
 
             if type == "Reading" or type == "Math" or type == "Writing":
                 mega_domain = MegaDomain.objects.filter(name=type).first()
-                print("mega_domain===>",mega_domain)
+                print("mega_domain===>", mega_domain)
                 mega_domain_id = mega_domain.id
 
             appointment = Appointments.objects.get(id=appointment_id)
@@ -3507,19 +3503,19 @@ class CpeaReportBaseViewSet(BaseViewset):
             )
         except Exception as e:
             return Response(str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-        
+
     def get_student_cpea_report(self, request, student_id):
         appointment_id = request.query_params.get("appointment_id")
 
         if appointment_id:
-            reports = StudentReadingCpeaReport.objects.filter(student_id=student_id, appointment_id=appointment_id)
+            reports = StudentReadingCpeaReport.objects.filter(
+                student_id=student_id, appointment_id=appointment_id
+            )
 
         else:
             reports = StudentReadingCpeaReport.objects.filter(student_id=student_id)
 
         serializer = StudentReadingCpeaReportSerializer(reports, many=True)
-       
 
         return Response(
             {
@@ -3529,7 +3525,7 @@ class CpeaReportBaseViewSet(BaseViewset):
                 "results": serializer.data,
             }
         )
-    
+
     def update_student_cpea_report(self, request, student_id, appointment_id):
         cpea_report = StudentCpeaReport.objects.get(
             student=student_id, appointment=appointment_id
@@ -3604,10 +3600,7 @@ class GroupClassesBaseViewSet(BaseViewset):
 
 
 class AssignGroupClassesBaseViewSet(BaseViewset):
-    # permission_classes = (
-    #     IsPlatformAdmin,
-    #     IsSsoManager,
-    # )
+    permission_classes = ((IsPlatformAdmin | IsSsoManager),)
 
     def assign_group_classes(self, request, deptHead_id):
         try:
